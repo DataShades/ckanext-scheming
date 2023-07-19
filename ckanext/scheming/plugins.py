@@ -293,6 +293,7 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
                 for f in scheming_schema['dataset_fields']
                 if 'repeating_subfields' in f
             }
+
             if dataset_composite:
                 expand_form_composite(data_dict, dataset_composite)
             resource_composite = {
@@ -384,17 +385,18 @@ def expand_form_composite(data, fieldnames):
     fieldnames -= set(data)
     if not fieldnames:
         return
-    indexes = {}
+    from collections import defaultdict
+    indexes = defaultdict(dict)
     for key in sorted(data):
         if '-' not in key:
             continue
         parts = key.split('-')
         if parts[0] not in fieldnames:
             continue
-        if parts[1] not in indexes:
-            indexes[parts[1]] = len(indexes)
+        if parts[1] not in indexes[parts[0]]:
+            indexes[parts[0]][parts[1]] = len(indexes[parts[0]])
         comp = data.setdefault(parts[0], [])
-        parts[1] = indexes[parts[1]]
+        parts[1] = indexes[parts[0]][parts[1]]
         try:
             try:
                 comp[int(parts[1])]['-'.join(parts[2:])] = data[key]

@@ -85,6 +85,7 @@ def scheming_required(field, schema):
     """
     not_empty if field['required'] else ignore_missing
     """
+
     if field.get('required'):
         return not_empty
     return ignore_missing
