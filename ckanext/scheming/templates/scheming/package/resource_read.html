@@ -34,7 +34,7 @@
         {%- block resource_format -%}
           <tr>
             <th scope="row">{{ _('Format') }}</th>
-            <td>{{ res.mimetype_inner or res.mimetype or res.format or _('unknown') }}</td>
+            <td>{{ res.format or _('unknown') }}</td>
           </tr>
         {%- endblock -%}
         {%- block resource_license -%}
