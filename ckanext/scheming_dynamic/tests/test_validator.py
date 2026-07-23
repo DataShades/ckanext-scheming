@@ -93,8 +93,13 @@ class TestIterErrors:
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/choices/0/label" for e in errors)
 
-    def test_choices_missing_label_is_rejected(self):
+    def test_choices_missing_label_is_accepted(self):
+        # scheming_choices_label() falls back to `c.get('label', value)`.
         data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "choices": [{"value": "a"}]}]}
+        assert errors_for(data) == []
+
+    def test_choices_missing_value_is_rejected(self):
+        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "choices": [{"label": "A"}]}]}
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/choices/0" for e in errors)
 

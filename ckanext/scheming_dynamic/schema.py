@@ -45,7 +45,12 @@ class BaseSchema:
 
     CHOICE = {
         "type": "object",
-        "required": ["value", "label"],
+        "required": ["value"],
+        "description": (
+            "`label` is optional: ckanext-scheming's own "
+            "scheming_choices_label() helper falls back to the value "
+            "itself (c.get('label', value)) when a choice has no label."
+        ),
         "properties": {
             "value": {"$ref": "#/$defs/anytype"},
             "label": {"$ref": "#/$defs/i18n_text"},
