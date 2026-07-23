@@ -58,5 +58,7 @@ jobs:
         ckan -c test.ini db init
     - name: Run all tests
       run: pytest --ckan-ini=test.ini --cov=ckanext.scheming ckanext/scheming/tests
+    - name: Run scheming_dynamic tests
+      run: pytest --ckan-ini=test.ini --cov=ckanext.scheming_dynamic ckanext/scheming_dynamic/tests
     - name: Run plugin subclassing tests
       run: pytest --ckan-ini=test_subclass.ini ckanext/scheming/tests/test_dataset_display.py ckanext/scheming/tests/test_form.py::TestDatasetFormNew ckanext/scheming/tests/test_dataset_logic.py
