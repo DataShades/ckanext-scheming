@@ -44,7 +44,10 @@ class TestIterErrors:
         assert any(error_location(e) == "dataset_fields/0/field_name" for e in errors)
 
     def test_required_wrong_type_is_reported(self):
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "required": "yes"}]}
+        data = {
+            **MINIMAL_DATASET,
+            "dataset_fields": [{"field_name": "x", "required": "yes"}],
+        }
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/required" for e in errors)
 
@@ -57,13 +60,18 @@ class TestIterErrors:
         assert any(error_location(e) == "dataset_fields/0/preset" for e in errors)
 
     def test_known_preset_is_accepted(self):
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "preset": "title"}]}
+        data = {
+            **MINIMAL_DATASET,
+            "dataset_fields": [{"field_name": "x", "preset": "title"}],
+        }
         assert errors_for(data) == []
 
     def test_multilang_label_is_accepted(self):
         data = {
             **MINIMAL_DATASET,
-            "dataset_fields": [{"field_name": "x", "label": {"en": "Title", "fr": "Titre"}}],
+            "dataset_fields": [
+                {"field_name": "x", "label": {"en": "Title", "fr": "Titre"}}
+            ],
         }
         assert errors_for(data) == []
 
@@ -76,7 +84,10 @@ class TestIterErrors:
         assert any(error_location(e) == "dataset_fields/0/label" for e in errors)
 
     def test_null_label_is_accepted(self):
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "label": None}]}
+        data = {
+            **MINIMAL_DATASET,
+            "dataset_fields": [{"field_name": "x", "label": None}],
+        }
         assert errors_for(data) == []
 
     def test_boolean_choice_label_is_rejected(self):
@@ -91,15 +102,23 @@ class TestIterErrors:
             ],
         }
         errors = errors_for(data)
-        assert any(error_location(e) == "dataset_fields/0/choices/0/label" for e in errors)
+        assert any(
+            error_location(e) == "dataset_fields/0/choices/0/label" for e in errors
+        )
 
     def test_choices_missing_label_is_accepted(self):
         # scheming_choices_label() falls back to `c.get('label', value)`.
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "choices": [{"value": "a"}]}]}
+        data = {
+            **MINIMAL_DATASET,
+            "dataset_fields": [{"field_name": "x", "choices": [{"value": "a"}]}],
+        }
         assert errors_for(data) == []
 
     def test_choices_missing_value_is_rejected(self):
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "choices": [{"label": "A"}]}]}
+        data = {
+            **MINIMAL_DATASET,
+            "dataset_fields": [{"field_name": "x", "choices": [{"label": "A"}]}],
+        }
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/choices/0" for e in errors)
 
@@ -122,7 +141,10 @@ class TestIterErrors:
 
     def test_default_accepts_any_scalar_type(self):
         for default in ("abc", 1, True, None):
-            data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": "x", "default": default}]}
+            data = {
+                **MINIMAL_DATASET,
+                "dataset_fields": [{"field_name": "x", "default": default}],
+            }
             assert errors_for(data) == []
 
     def test_unknown_field_keys_are_ignored(self):
@@ -144,7 +166,10 @@ class TestLoadData:
     def test_load_yaml(self, tmp_path):
         path = tmp_path / "schema.yaml"
         path.write_text("about_url: https://example.com\ndataset_type: foo\n")
-        assert load_data(path) == {"about_url": "https://example.com", "dataset_type": "foo"}
+        assert load_data(path) == {
+            "about_url": "https://example.com",
+            "dataset_type": "foo",
+        }
 
     def test_load_yml_extension(self, tmp_path):
         path = tmp_path / "schema.yml"
@@ -164,6 +189,9 @@ class TestErrorLocation:
         assert all(error_location(e) == "<root>" for e in errors)
 
     def test_nested_error_location(self):
-        data = {**MINIMAL_DATASET, "resource_fields": [{"field_name": "x", "required": "yes"}]}
+        data = {
+            **MINIMAL_DATASET,
+            "resource_fields": [{"field_name": "x", "required": "yes"}],
+        }
         errors = errors_for(data)
         assert any(error_location(e) == "resource_fields/0/required" for e in errors)

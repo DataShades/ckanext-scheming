@@ -132,10 +132,10 @@ class BaseSchema:
 
         TODO: for not we're using the built-in presets.json
         """
-        from ckanext.scheming.plugins import _SchemingMixin
+        from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
 
         _SchemingMixin._load_presets(tk.config)
-        return sorted(_SchemingMixin._presets) # type: ignore
+        return sorted(_SchemingMixin._presets)  # type: ignore
 
 
 class DatasetSchema(BaseSchema):

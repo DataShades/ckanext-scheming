@@ -12,9 +12,12 @@ from ckanext.scheming_dynamic.schema import (
 
 class TestSchemaTypes:
     @pytest.mark.parametrize(
-        "schema_cls,expected_required",
+        ("schema_cls", "expected_required"),
         [
-            (DatasetSchema, ["about_url", "dataset_type", "dataset_fields", "resource_fields"]),
+            (
+                DatasetSchema,
+                ["about_url", "dataset_type", "dataset_fields", "resource_fields"],
+            ),
             (GroupSchema, ["about_url", "group_type", "fields"]),
             (OrganisationSchema, ["about_url", "organization_type", "fields"]),
         ],
@@ -24,14 +27,16 @@ class TestSchemaTypes:
         assert built["required"] == expected_required
 
     @pytest.mark.parametrize(
-        "schema_cls,field_list_keys",
+        ("schema_cls", "field_list_keys"),
         [
             (DatasetSchema, ["dataset_fields", "resource_fields"]),
             (GroupSchema, ["fields"]),
             (OrganisationSchema, ["fields"]),
         ],
     )
-    def test_field_list_properties_reference_shared_field_def(self, schema_cls, field_list_keys):
+    def test_field_list_properties_reference_shared_field_def(
+        self, schema_cls, field_list_keys
+    ):
         built = schema_cls().build()
         for key in field_list_keys:
             assert built["properties"][key]["items"] == {"$ref": "#/$defs/field"}
@@ -44,12 +49,19 @@ class TestSchemaTypes:
     def test_common_root_properties_are_shared(self):
         for schema_cls in SCHEMA_TYPES.values():
             props = schema_cls().build()["properties"]
-            assert props["about_url"] == {"type": "string", "format": "uri", "minLength": 1}
+            assert props["about_url"] == {
+                "type": "string",
+                "format": "uri",
+                "minLength": 1,
+            }
             assert props["about"] == {"type": "string"}
             assert props["scheming_version"] == {"type": "integer"}
 
     def test_field_def_is_identical_across_schema_types(self):
-        built = [schema_cls().build()["$defs"]["field"] for schema_cls in SCHEMA_TYPES.values()]
+        built = [
+            schema_cls().build()["$defs"]["field"]
+            for schema_cls in SCHEMA_TYPES.values()
+        ]
         assert all(field_def == built[0] for field_def in built)
 
     def test_builtin_preset_names_include_known_presets(self):

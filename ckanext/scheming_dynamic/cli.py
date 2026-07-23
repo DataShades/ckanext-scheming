@@ -8,6 +8,7 @@ import click
 from ckanext.scheming_dynamic.schema import SCHEMA_TYPES
 from ckanext.scheming_dynamic.validator import error_location, iter_errors, load_data
 
+
 schema_type_option = click.option(
     "-t",
     "--type",

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from ckan.cli.cli import ckan
 
 VALID_DATASET_SCHEMA = {
@@ -35,7 +34,7 @@ class TestSchemaCommand:
         ]
 
     @pytest.mark.parametrize(
-        "schema_type,required_key",
+        ("schema_type", "required_key"),
         [("group", "group_type"), ("organization", "organization_type")],
     )
     def test_type_option(self, cli, schema_type, required_key):
@@ -45,9 +44,7 @@ class TestSchemaCommand:
         assert required_key in built["required"]
 
     def test_invalid_type_option_is_rejected(self, cli):
-        result = cli.invoke(
-            ckan, ["scheming-dynamic", "schema", "--type", "not-a-type"]
-        )
+        result = cli.invoke(ckan, ["scheming-dynamic", "schema", "--type", "not-a-type"])
         assert result.exit_code != 0
 
 
@@ -72,13 +69,9 @@ class TestValidateCommand:
 
     def test_multiple_files_are_all_reported(self, cli, tmp_path):
         valid = write_schema(tmp_path, VALID_DATASET_SCHEMA, "valid.json")
-        invalid = write_schema(
-            tmp_path, {"about_url": "https://example.com"}, "invalid.json"
-        )
+        invalid = write_schema(tmp_path, {"about_url": "https://example.com"}, "invalid.json")
 
-        result = cli.invoke(
-            ckan, ["scheming-dynamic", "validate", str(valid), str(invalid)]
-        )
+        result = cli.invoke(ckan, ["scheming-dynamic", "validate", str(valid), str(invalid)])
 
         assert result.exit_code == 1
         assert "OK - no schema violations" in result.output
@@ -89,7 +82,5 @@ class TestValidateCommand:
         assert result.exit_code != 0
 
     def test_nonexistent_file_is_rejected(self, cli):
-        result = cli.invoke(
-            ckan, ["scheming-dynamic", "validate", "/no/such/file.yaml"]
-        )
+        result = cli.invoke(ckan, ["scheming-dynamic", "validate", "/no/such/file.yaml"])
         assert result.exit_code != 0
