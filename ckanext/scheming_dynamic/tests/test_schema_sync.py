@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 
 import ckan.plugins.toolkit as tk
+from ckan.lib.plugins import lookup_package_plugin
 from ckan.tests import helpers
 
+from ckanext.scheming.plugins import SchemingDatasetsPlugin
 from ckanext.scheming_dynamic.model import SchemingSchema
 
 DEFINITION = {
@@ -31,6 +33,20 @@ class TestDynamicSchemaSync:
         schemas = tk.h.scheming_dataset_schemas()
         assert "test-type" in schemas
         assert "dataset" in schemas
+
+    def test_new_type_resolves_to_scheming_plugin(self):
+        definition = {**DEFINITION, "dataset_type": "lookup-test-type"}
+
+        assert lookup_package_plugin("lookup-test-type") is not SchemingDatasetsPlugin.instance
+
+        helpers.call_action(
+            "scheming_schema_create",
+            schema_type="lookup-test-type",
+            definition=definition,
+        )
+        tk.h.scheming_dataset_schemas()  # trigger the lazy DB sync
+
+        assert lookup_package_plugin("lookup-test-type") is SchemingDatasetsPlugin.instance
 
     def test_db_schema_overrides_file_schema(self):
         definition = {**DEFINITION, "dataset_type": "dataset"}

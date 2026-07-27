@@ -7,6 +7,7 @@ from typing import Any
 import ckan.plugins as p
 from ckan import model
 from ckan.common import c, json
+from ckan.lib import plugins as lib_plugins
 from ckan.lib.navl.dictization_functions import unflatten
 from ckan.plugins.toolkit import (
     DefaultDatasetForm,
@@ -254,6 +255,23 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
         self._schemas_value = merged
         self._expanded_value = expanded
         self._dataset_form_pages = _build_dataset_form_pages(expanded)
+        self._register_dynamic_package_types(merged)
+
+    def _register_dynamic_package_types(self, schemas: dict[str, Any]) -> None:
+        """Make newly-created dynamic dataset types resolve to this plugin.
+
+        ``ckan.lib.plugins.lookup_package_plugin`` (used throughout
+        ``ckan.views.dataset`` for templates and validation) resolves a
+        package type from a dict populated once, at app startup, from every
+        ``IDatasetForm.package_types()``.
+
+        A dataset type added to the database afterwards is missing from
+        that dict, so lookups for it silently fall back to the default
+        IDatasetForm instead of us. Fill in only the missing entries here;
+        never overwrite a type some other plugin already claimed at startup.
+        """
+        for package_type in schemas:
+            lib_plugins._package_plugins.setdefault(package_type, self)  # type: ignore
 
     def read_template(self):
         return 'scheming/package/read.html'
