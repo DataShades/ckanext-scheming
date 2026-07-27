@@ -52,8 +52,6 @@ presets registered at startup.
 
 - Only dataset schemas are merged at runtime; `group`/`organization` rows
   can be stored but are not yet picked up by ckanext-scheming.
-- Form pages (`start_form_page`) work for types known at startup only: the
-  paged create/edit routes are registered per type when the app boots.
 - Changing a schema does not reindex existing datasets; run
   `ckan search-index rebuild` after incompatible changes.
 - Custom presets must be registered at startup via `scheming.presets`;

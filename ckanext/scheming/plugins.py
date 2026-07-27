@@ -258,20 +258,40 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
         self._register_dynamic_package_types(merged)
 
     def _register_dynamic_package_types(self, schemas: dict[str, Any]) -> None:
-        """Make newly-created dynamic dataset types resolve to this plugin.
+        """Register dynamic dataset types.
 
-        ``ckan.lib.plugins.lookup_package_plugin`` (used throughout
-        ``ckan.views.dataset`` for templates and validation) resolves a
-        package type from a dict populated once, at app startup, from every
-        ``IDatasetForm.package_types()``.
+        Keep newly-created/removed dynamic dataset types in sync with
+        ``ckan.lib.plugins.lookup_package_plugin``.
+
+        That function (used throughout ``ckan.views.dataset`` for templates
+        and validation) resolves a package type from a dict populated once,
+        at app startup, from every ``IDatasetForm.package_types()``.
 
         A dataset type added to the database afterwards is missing from
         that dict, so lookups for it silently fall back to the default
         IDatasetForm instead of us. Fill in only the missing entries here;
         never overwrite a type some other plugin already claimed at startup.
+
+        Conversely, if a dynamic type we previously claimed here is later
+        deleted from the database, drop it again: otherwise lookups for it
+        would keep resolving to us even though ``self._schemas`` no longer
+        has a definition for it, and our templates unconditionally call
+        ``h.scheming_get_dataset_schema(dataset_type)`` expecting one to
+        exist.
         """
-        for package_type in schemas:
+        current_types = set(schemas)
+
+        for package_type in current_types:
             lib_plugins._package_plugins.setdefault(package_type, self)  # type: ignore
+
+        stale = [
+            package_type
+            for package_type, plugin in lib_plugins._package_plugins.items()
+            if plugin is self and package_type not in current_types
+        ]
+
+        for package_type in stale:
+            del lib_plugins._package_plugins[package_type]
 
     def read_template(self):
         return 'scheming/package/read.html'
@@ -394,27 +414,7 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
             self._expanded_schemas)
 
     def prepare_dataset_blueprint(self, package_type, bp):
-        if self._dataset_form_pages[package_type]:
-            bp.add_url_rule(
-                '/new',
-                'scheming_new',
-                views.SchemingCreateView.as_view('new'),
-            )
-            bp.add_url_rule(
-                '/new/<id>/<page>',
-                'scheming_new_page',
-                views.SchemingCreatePageView.as_view('new_page'),
-            )
-            bp.add_url_rule(
-                '/edit/<id>',
-                'scheming_edit',
-                views.edit,
-            )
-            bp.add_url_rule(
-                '/edit/<id>/<page>',
-                'scheming_edit_page',
-                views.SchemingEditPageView.as_view('edit_page'),
-            )
+        views.add_paged_form_rules(bp)
         return bp
 
 

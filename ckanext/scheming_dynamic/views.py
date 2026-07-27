@@ -30,6 +30,7 @@ from ckan.views.resource import (
 from ckan.views.resource import resource
 
 from ckanext.scheming.plugins import SchemingDatasetsPlugin
+from ckanext.scheming.views import add_paged_form_rules
 from ckanext.scheming_dynamic.model import SchemingSchema
 
 DATASET_BP = "scheming_dynamic"
@@ -40,6 +41,7 @@ def get_blueprints() -> list[Blueprint]:
     dataset_bp = Blueprint(
         DATASET_BP, dataset.import_name, url_prefix="/<package_type>"
     )
+    add_paged_form_rules(dataset_bp)
     register_dataset_plugin_rules(dataset_bp)
     dataset_bp.before_request(_dynamic_type_or_404)
 
