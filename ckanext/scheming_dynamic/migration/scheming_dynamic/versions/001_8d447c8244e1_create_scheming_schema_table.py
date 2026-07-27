@@ -22,7 +22,7 @@ def upgrade():
         "scheming_schema",
         sa.Column("entity_type", sa.Text, primary_key=True),
         sa.Column("schema_type", sa.Text, primary_key=True),
-        sa.Column("updated", sa.TIMESTAMP),
+        sa.Column("updated", sa.TIMESTAMP(timezone=True)),
         sa.Column("definition", JSONB),
     )
     op.create_index("ix_scheming_schema_updated", "scheming_schema", ["updated"])

@@ -1,5 +1,10 @@
-import ckan.plugins as p
+from functools import partial
 
+import ckan.plugins as p
+from ckan import types
+from ckan.common import CKANConfig
+
+from ckanext.scheming_dynamic import views
 from ckanext.scheming_dynamic.cli import get_commands
 from ckanext.scheming_dynamic.logic.action import get_actions
 from ckanext.scheming_dynamic.logic.auth import get_auth_functions
@@ -12,6 +17,8 @@ class SchemingDynamicPlugin(p.SingletonPlugin):
     p.implements(p.IActions)
     p.implements(p.IAuthFunctions)
     p.implements(p.IValidators)
+    p.implements(p.IBlueprint)
+    p.implements(p.IMiddleware, inherit=True)
 
     # IClick
 
@@ -32,3 +39,16 @@ class SchemingDynamicPlugin(p.SingletonPlugin):
 
     def get_validators(self):
         return get_validators()
+
+    # IBlueprint
+
+    def get_blueprint(self):
+        return views.get_blueprints()
+
+    # IMiddleware
+
+    def make_middleware(self, app: types.CKANApp, config: CKANConfig) -> types.CKANApp:
+        # url_for("<type>.read") for types created after startup
+        if hasattr(app, "url_build_error_handlers"):
+            app.url_build_error_handlers.append(partial(views.build_dynamic_type_url, app))
+        return app

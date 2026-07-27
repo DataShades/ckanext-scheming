@@ -1,19 +1,14 @@
-"""JSON Schema builders for ckanext-scheming schema files (dataset, group,
-organization). Each type shares the same field-level rules (BaseSchema) and
-only differs in which root-level keys it requires.
-"""
-
 from __future__ import annotations
 
-import json
-from importlib import resources
 from typing import Any
 
 import ckan.plugins.toolkit as tk
 
 
 class BaseSchema:
-    """Shared root keys (`about_url`, `about`, `scheming_version`) and all
+    """Base class for dataset, group, and organization schemas.
+
+    Shared root keys (`about_url`, `about`, `scheming_version`) and all
     field-level $defs. Subclasses add the root keys specific to their
     schema type.
     """
@@ -110,31 +105,27 @@ class BaseSchema:
             "preset": {
                 "type": "string",
                 "description": (
-                    "Must be one of the presets shipped in "
-                    "ckanext/scheming/presets.json. Custom/vendor presets "
-                    "registered via scheming.presets are out of scope for "
-                    "this schema and will be reported as errors."
+                    "Must be one of the presets registered at startup: the "
+                    "built-in ckanext/scheming/presets.json plus any files "
+                    "listed in the scheming.presets config option."
                 ),
-                "enum": self._builtin_preset_names(),
+                "enum": self._registered_preset_names(),
             },
             "field": self.FIELD,
         }
 
     @staticmethod
-    def _builtin_preset_names() -> list[str]:
-        presets_json = resources.files("ckanext.scheming").joinpath("presets.json")
-        presets = json.loads(presets_json.read_text())["presets"]
-        return [p["preset_name"] for p in presets]
+    def _registered_preset_names() -> list[str]:
+        """Return the names of all presets registered at startup.
 
-    @staticmethod
-    def _collect_registered_presets() -> list[str]:
-        """Preset names ckanext-scheming itself would accept.
-
-        TODO: for not we're using the built-in presets.json
+        Preset names ckanext-scheming itself would accept: the presets
+        loaded at startup from the scheming.presets config option.
         """
         from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
 
-        _SchemingMixin._load_presets(tk.config)
+        if _SchemingMixin._presets is None:
+            _SchemingMixin._load_presets(tk.config)
+
         return sorted(_SchemingMixin._presets)  # type: ignore
 
 

@@ -34,9 +34,7 @@ class TestSchemaTypes:
             (OrganisationSchema, ["fields"]),
         ],
     )
-    def test_field_list_properties_reference_shared_field_def(
-        self, schema_cls, field_list_keys
-    ):
+    def test_field_list_properties_reference_shared_field_def(self, schema_cls, field_list_keys):
         built = schema_cls().build()
         for key in field_list_keys:
             assert built["properties"][key]["items"] == {"$ref": "#/$defs/field"}
@@ -58,10 +56,7 @@ class TestSchemaTypes:
             assert props["scheming_version"] == {"type": "integer"}
 
     def test_field_def_is_identical_across_schema_types(self):
-        built = [
-            schema_cls().build()["$defs"]["field"]
-            for schema_cls in SCHEMA_TYPES.values()
-        ]
+        built = [schema_cls().build()["$defs"]["field"] for schema_cls in SCHEMA_TYPES.values()]
         assert all(field_def == built[0] for field_def in built)
 
     def test_builtin_preset_names_include_known_presets(self):

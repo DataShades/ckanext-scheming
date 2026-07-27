@@ -1,42 +1,27 @@
-#!/usr/bin/env python
-# encoding: utf-8
-import os
 import inspect
 import logging
+import os
 from functools import wraps
+from typing import Any
 
-import six
-import yaml
 import ckan.plugins as p
-
-try:
-    from paste.reloader import watch_file
-except ImportError:
-    watch_file = None
-
-import ckan.model as model
+from ckan import model
 from ckan.common import c, json
-from ckan.lib.navl.dictization_functions import unflatten, flatten_schema
-try:
-    from ckan.lib.helpers import helper_functions as core_helper_functions
-except ImportError:  # CKAN <= 2.5
-    core_helper_functions = None
-
+from ckan.lib.navl.dictization_functions import unflatten
 from ckan.plugins.toolkit import (
     DefaultDatasetForm,
     DefaultGroupForm,
     DefaultOrganizationForm,
-    get_validator,
-    get_converter,
-    navl_validate,
-    add_template_directory,
     add_resource,
-    add_public_directory,
-    missing,
+    add_template_directory,
     check_ckan_version,
+    get_converter,
+    get_validator,
+    missing,
+    navl_validate,
 )
 
-from ckanext.scheming import helpers, validation, logic, loader, views
+from ckanext.scheming import helpers, loader, logic, validation, views
 from ckanext.scheming.errors import SchemingException
 
 ignore_missing = get_validator('ignore_missing')
@@ -212,9 +197,63 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
     FALLBACK_OPTION = 'scheming.dataset_fallback'
     SCHEMA_TYPE_FIELD = 'dataset_type'
 
+    _static_schemas = {}
+    _schemas_value = {}
+    _expanded_value = {}
+
     @classmethod
     def _store_instance(cls, self):
         SchemingDatasetsPlugin.instance = self
+
+    @property
+    def _schemas(self):
+        self._sync_dynamic_schemas()
+        return self._schemas_value
+
+    @_schemas.setter
+    def _schemas(self, value):
+        # keep the file-defined schemas around: they are the base the
+        # dynamic database schemas get merged over
+        self._static_schemas = value
+        self._schemas_value = value
+
+    @property
+    def _expanded_schemas(self):
+        self._sync_dynamic_schemas()
+        return self._expanded_value
+
+    @_expanded_schemas.setter
+    def _expanded_schemas(self, value: dict[str, Any]) -> None:
+        self._expanded_value = value
+
+    def _sync_dynamic_schemas(self):
+        """Sync dynamic schemas with the database.
+
+        Reload dataset schemas when the scheming_dynamic database table
+        changed since the last merge, so schema edits show up without a
+        server restart.
+        """
+        if not p.plugin_loaded('scheming_dynamic'):
+            return
+
+        from ckanext.scheming_dynamic import schema_sync # noqa
+
+        merged = schema_sync.dataset_schemas_if_changed(self._static_schemas)
+        if merged is None:
+            return
+
+        try:
+            expanded = _expand_schemas(merged)
+        except SchemingException:
+            log.exception(
+                'unable to expand dynamic dataset schemas, '
+                'keeping the previous ones')
+            return
+
+        schema_sync.confirm_applied()
+        self._schemas_value = merged
+        self._expanded_value = expanded
+        self._dataset_form_pages = _build_dataset_form_pages(expanded)
 
     def read_template(self):
         return 'scheming/package/read.html'
@@ -333,25 +372,8 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
             c.licenses = [('', '')] + model.Package.get_license_options()
 
     def configure(self, config):
-        self._dataset_form_pages = {}
-
-        for t, schema in self._expanded_schemas.items():
-            pages = []
-            self._dataset_form_pages[t] = pages
-
-            for f in schema['dataset_fields']:
-                if not pages or 'start_form_page' in f:
-                    fp = f.get('start_form_page', {})
-                    pages.append({
-                        'title': fp.get('title', ''),
-                        'description': fp.get('description', ''),
-                        'fields': [],
-                    })
-                pages[-1]['fields'].append(f)
-
-            if len(pages) == 1 and not pages[0]['title']:
-                # no pages defined
-                pages[:] = []
+        self._dataset_form_pages = _build_dataset_form_pages(
+            self._expanded_schemas)
 
     def prepare_dataset_blueprint(self, package_type, bp):
         if self._dataset_form_pages[package_type]:
@@ -376,6 +398,30 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
                 views.SchemingEditPageView.as_view('edit_page'),
             )
         return bp
+
+
+def _build_dataset_form_pages(expanded_schemas):
+    form_pages = {}
+
+    for t, schema in expanded_schemas.items():
+        pages = []
+        form_pages[t] = pages
+
+        for f in schema['dataset_fields']:
+            if not pages or 'start_form_page' in f:
+                fp = f.get('start_form_page', {})
+                pages.append({
+                    'title': fp.get('title', ''),
+                    'description': fp.get('description', ''),
+                    'fields': [],
+                })
+            pages[-1]['fields'].append(f)
+
+        if len(pages) == 1 and not pages[0]['title']:
+            # no pages defined
+            pages[:] = []
+
+    return form_pages
 
 
 def expand_form_composite(data, schema):
@@ -539,7 +585,7 @@ def _load_schema(url):
     return schema
 
 
-def _load_schema_module_path(url):
+def _load_schema_module_path(url: str):
     """
     Given a path like "ckanext.spatialx:spatialx_schema.json"
     find the second part relative to the import path of the first
@@ -554,8 +600,6 @@ def _load_schema_module_path(url):
 
     p = os.path.join(os.path.dirname(inspect.getfile(m)), file_name)
     if os.path.exists(p):
-        if watch_file:
-            watch_file(p)
         with open(p) as schema_file:
             return loader.load(schema_file)
 

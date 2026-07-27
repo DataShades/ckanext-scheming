@@ -33,10 +33,7 @@ class TestIterErrors:
     def test_missing_field_name_is_reported(self):
         data = {**MINIMAL_DATASET, "dataset_fields": [{"label": "No name here"}]}
         errors = errors_for(data)
-        assert any(
-            error_location(e) == "dataset_fields/0" and "field_name" in e.message
-            for e in errors
-        )
+        assert any(error_location(e) == "dataset_fields/0" and "field_name" in e.message for e in errors)
 
     def test_field_name_wrong_type_is_reported(self):
         data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": 123}]}
@@ -69,9 +66,7 @@ class TestIterErrors:
     def test_multilang_label_is_accepted(self):
         data = {
             **MINIMAL_DATASET,
-            "dataset_fields": [
-                {"field_name": "x", "label": {"en": "Title", "fr": "Titre"}}
-            ],
+            "dataset_fields": [{"field_name": "x", "label": {"en": "Title", "fr": "Titre"}}],
         }
         assert errors_for(data) == []
 
@@ -102,9 +97,7 @@ class TestIterErrors:
             ],
         }
         errors = errors_for(data)
-        assert any(
-            error_location(e) == "dataset_fields/0/choices/0/label" for e in errors
-        )
+        assert any(error_location(e) == "dataset_fields/0/choices/0/label" for e in errors)
 
     def test_choices_missing_label_is_accepted(self):
         # scheming_choices_label() falls back to `c.get('label', value)`.

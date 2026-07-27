@@ -27,16 +27,22 @@ def call_validator(entity_type: str, schema_type: str) -> None:
 @pytest.mark.usefixtures("with_plugins", "clean_db")
 class TestSchemingSchemaExists:
     def test_existing_schema_passes(self):
-        SchemingSchema.create("dataset", "dataset", DEFINITION)
+        SchemingSchema.create("dataset", "test-type", DEFINITION)
 
-        assert call_validator("dataset", "dataset") is None
+        assert call_validator("dataset", "test-type") is None
 
     def test_missing_schema_raises_invalid(self):
         with pytest.raises(tk.Invalid, match="not found"):
-            call_validator("dataset", "dataset")
+            call_validator("dataset", "test-type")
 
     def test_schema_for_other_entity_type_does_not_count(self):
-        SchemingSchema.create("group", "group", DEFINITION)
+        SchemingSchema.create("group", "test-type", DEFINITION)
 
         with pytest.raises(tk.Invalid, match="not found"):
-            call_validator("dataset", "dataset")
+            call_validator("dataset", "test-type")
+
+    def test_missing_entity_type_defaults_to_dataset(self):
+        SchemingSchema.create("dataset", "test-type", DEFINITION)
+
+        data = {("schema_type",): "test-type"}
+        assert scheming_schema_exists(("schema_type",), data, {}, {}) is None
