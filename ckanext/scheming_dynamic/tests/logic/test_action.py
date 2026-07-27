@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import ckan.plugins.toolkit as tk
-from ckan.tests import helpers
+from ckan.tests import factories, helpers
 
 from ckanext.scheming_dynamic.model import SchemingSchema
 
@@ -192,3 +192,12 @@ class TestSchemingSchemaDelete:
     def test_delete_missing_schema_type_is_rejected(self):
         with pytest.raises(tk.ValidationError):
             helpers.call_action("scheming_schema_delete")
+
+    def test_delete_is_rejected_when_packages_of_type_exist(self):
+        SchemingSchema.create("dataset", "test-type", VALID_DEFINITION)
+        factories.Dataset(type="test-type")
+
+        with pytest.raises(tk.ValidationError):
+            helpers.call_action("scheming_schema_delete", schema_type="test-type")
+
+        assert SchemingSchema.get("dataset", "test-type")

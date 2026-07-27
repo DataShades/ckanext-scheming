@@ -39,9 +39,12 @@ def scheming_schema_update(
 
 
 @validator_args
-def scheming_schema_delete() -> types.Schema:
+def scheming_schema_delete(
+    scheming_schema_not_in_use: types.DataValidator,
+) -> types.Schema:
     schema = scheming_schema_update()
 
     schema.pop("definition", None)
+    schema["schema_type"].append(scheming_schema_not_in_use)
 
     return schema

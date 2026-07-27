@@ -48,6 +48,25 @@ class TestDynamicSchemaSync:
 
         assert lookup_package_plugin("lookup-test-type") is SchemingDatasetsPlugin.instance
 
+    def test_deleted_type_stops_resolving_to_scheming_plugin(self):
+        definition = {**DEFINITION, "dataset_type": "test-deleted"}
+
+        helpers.call_action(
+            "scheming_schema_create",
+            schema_type="test-deleted",
+            definition=definition,
+        )
+        tk.h.scheming_dataset_schemas()
+        assert lookup_package_plugin("test-deleted") is SchemingDatasetsPlugin.instance
+
+        helpers.call_action("scheming_schema_delete", schema_type="test-deleted")
+        tk.h.scheming_dataset_schemas()
+
+        # once the schema is gone, this plugin must stop claiming the type:
+        # its templates unconditionally assume scheming_get_dataset_schema()
+        # returns a definition, and would crash otherwise
+        assert lookup_package_plugin("test-deleted") is not SchemingDatasetsPlugin.instance
+
     def test_db_schema_overrides_file_schema(self):
         definition = {**DEFINITION, "dataset_type": "dataset"}
 

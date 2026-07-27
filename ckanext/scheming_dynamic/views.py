@@ -29,6 +29,7 @@ from ckan.views.resource import (
 )
 from ckan.views.resource import resource
 
+from ckanext.scheming.plugins import SchemingDatasetsPlugin
 from ckanext.scheming_dynamic.model import SchemingSchema
 
 DATASET_BP = "scheming_dynamic"
@@ -98,3 +99,23 @@ def _dynamic_type_or_404() -> None:
 
     if not package_type or not SchemingSchema.get("dataset", package_type):
         tk.abort(404, tk._("Dataset type not found"))
+
+    _sync_scheming_datasets_plugin()
+
+
+def _sync_scheming_datasets_plugin() -> None:
+    """Force SchemingDatasetsPlugin to claim this request's package_type.
+
+    ``ckan.views.dataset`` resolves the form/template plugin via
+    ``lookup_package_plugin(package_type)`` as one of the very first things
+    it does (e.g. building the ``package_form`` snippet), which reads a
+    dict SchemingDatasetsPlugin only updates as a side effect of its own
+    lazy DB sync (``SchemingDatasetsPlugin._schemas``/``_expanded_schemas``).
+    Nothing else guarantees that sync has run yet on a freshly created
+    type's very first request in a worker -- without this, that request
+    still sees the default IDatasetForm/templates.
+    """
+    plugin = SchemingDatasetsPlugin.instance
+
+    if plugin is not None:
+        plugin._sync_dynamic_schemas()
