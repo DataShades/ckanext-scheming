@@ -11,13 +11,6 @@ from ckanext.scheming_dynamic.logic.validators import (
 )
 from ckanext.scheming_dynamic.model import SchemingSchema
 
-DEFINITION = {
-    "about_url": "https://example.com",
-    "dataset_type": "test-type",
-    "dataset_fields": [{"field_name": "title"}],
-    "resource_fields": [{"field_name": "url"}],
-}
-
 
 def call_validator(entity_type: str, schema_type: str) -> None:
     data = {
@@ -30,8 +23,8 @@ def call_validator(entity_type: str, schema_type: str) -> None:
 @pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
 @pytest.mark.usefixtures("with_plugins", "clean_db")
 class TestSchemingSchemaExists:
-    def test_existing_schema_passes(self):
-        SchemingSchema.create("dataset", "test-type", DEFINITION)
+    def test_existing_schema_passes(self, schema_definition):
+        SchemingSchema.create("dataset", "test-type", schema_definition)
 
         assert call_validator("dataset", "test-type") is None
 
@@ -39,14 +32,14 @@ class TestSchemingSchemaExists:
         with pytest.raises(tk.Invalid, match="not found"):
             call_validator("dataset", "test-type")
 
-    def test_schema_for_other_entity_type_does_not_count(self):
-        SchemingSchema.create("group", "test-type", DEFINITION)
+    def test_schema_for_other_entity_type_does_not_count(self, schema_definition):
+        SchemingSchema.create("group", "test-type", schema_definition)
 
         with pytest.raises(tk.Invalid, match="not found"):
             call_validator("dataset", "test-type")
 
-    def test_missing_entity_type_defaults_to_dataset(self):
-        SchemingSchema.create("dataset", "test-type", DEFINITION)
+    def test_missing_entity_type_defaults_to_dataset(self, schema_definition):
+        SchemingSchema.create("dataset", "test-type", schema_definition)
 
         data = {("schema_type",): "test-type"}
         assert scheming_schema_exists(("schema_type",), data, {}, {}) is None

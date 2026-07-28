@@ -1,0 +1,77 @@
+{% extends "admin/base.html" %}
+
+{% block subtitle %}{{ _('Scheming') }}{% endblock %}
+
+{% block primary_content_inner %}
+  {% if schemas %}
+    <table class="table table-header table-hover table-striped">
+      <thead>
+        <tr>
+          <th>{{ _('Schema type') }}</th>
+          <th>{{ _('Entity type') }}</th>
+          <th>{{ _('Last updated') }}</th>
+          <th>&nbsp;</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for schema in schemas %}
+          <tr>
+            <td>{{ schema.schema_type }}</td>
+            <td>{{ schema.entity_type }}</td>
+            <td>{{ h.render_datetime(schema.updated, with_hours=True) }}</td>
+            <td>
+              <form method="post" action="{% url_for 'scheming_dynamic_admin.delete', schema_type=schema.schema_type %}">
+                <div class="btn-group float-end">
+                  <a class="btn btn-secondary btn-sm"
+                      href="{% url_for 'scheming_dynamic_admin.edit', schema_type=schema.schema_type %}"
+                      aria-label="{{ _('Edit schema') }}"
+                      data-bs-title="{{ _('Edit schema') }}"
+                      data-bs-toggle="tooltip">
+                    <i class="fa fa-pencil"></i>
+                  </a>
+                    {{ h.csrf_input() }}
+                    <a type="submit" class="btn btn-danger btn-sm"
+                            data-module="confirm-action"
+                            data-module-with-data="true"
+                            data-module-content="{{ _('Are you sure you want to delete the schema for type {type}?').format(type=schema.schema_type) }}"
+                            aria-label="{{ _('Delete schema') }}"
+                            data-bs-title="{{ _('Delete schema') }}"
+                            data-bs-toggle="tooltip"
+                            >
+                      <i class="fa fa-times"></i>
+                    </a>
+                </div>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">{{ _('No dynamic schemas have been created yet.') }}</p>
+  {% endif %}
+
+  <a class="btn btn-primary float-end" href="{% url_for 'scheming_dynamic_admin.new' %}">
+    <i class="fa fa-plus-square"></i> {{ _('Add schema') }}
+  </a>
+{% endblock %}
+
+{% block secondary_content %}
+  <div class="module module-narrow module-shallow">
+    <div class="module-group">
+      <h2 class="module-heading">
+        <i class="fa fa-info-circle"></i>
+        {{ _('Dataset schemas') }}
+      </h2>
+      <div class="module-content">
+        {%- trans -%}
+          <p>Dynamic scheming schemas are stored in the database and become
+          available immediately: each schema defines a dataset type with its
+          own metadata fields.</p>
+          <p>Schemas configured through config files are not listed here and
+          cannot be edited from this page.</p>
+        {%- endtrans -%}
+      </div>
+    </div>
+  </div>
+{% endblock %}

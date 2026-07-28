@@ -3,14 +3,8 @@ from __future__ import annotations
 import json
 
 import pytest
-from ckan.cli.cli import ckan
 
-VALID_DATASET_SCHEMA = {
-    "about_url": "https://example.com",
-    "dataset_type": "test-type",
-    "dataset_fields": [{"field_name": "title"}],
-    "resource_fields": [{"field_name": "url"}],
-}
+from ckan.cli.cli import ckan
 
 
 def write_schema(tmp_path, data, name="schema.json"):
@@ -44,22 +38,24 @@ class TestSchemaCommand:
         assert required_key in built["required"]
 
     def test_invalid_type_option_is_rejected(self, cli):
-        result = cli.invoke(ckan, ["scheming-dynamic", "schema", "--type", "not-a-type"])
+        result = cli.invoke(
+            ckan, ["scheming-dynamic", "schema", "--type", "not-a-type"]
+        )
         assert result.exit_code != 0
 
 
 @pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
 @pytest.mark.usefixtures("with_plugins", "with_extended_cli")
 class TestValidateCommand:
-    def test_valid_schema_exits_zero(self, cli, tmp_path):
-        path = write_schema(tmp_path, VALID_DATASET_SCHEMA)
+    def test_valid_schema_exits_zero(self, cli, tmp_path, schema_definition):
+        path = write_schema(tmp_path, schema_definition)
         result = cli.invoke(ckan, ["scheming-dynamic", "validate", str(path)])
         assert result.exit_code == 0, result.output
         assert "OK - no schema violations" in result.output
 
-    def test_invalid_schema_exits_nonzero(self, cli, tmp_path):
+    def test_invalid_schema_exits_nonzero(self, cli, tmp_path, schema_definition):
         data = {
-            **VALID_DATASET_SCHEMA,
+            **schema_definition,
             "dataset_fields": [{"field_name": "x", "preset": "not_a_real_preset"}],
         }
         path = write_schema(tmp_path, data)
@@ -67,11 +63,15 @@ class TestValidateCommand:
         assert result.exit_code == 1
         assert "not_a_real_preset" in result.output
 
-    def test_multiple_files_are_all_reported(self, cli, tmp_path):
-        valid = write_schema(tmp_path, VALID_DATASET_SCHEMA, "valid.json")
-        invalid = write_schema(tmp_path, {"about_url": "https://example.com"}, "invalid.json")
+    def test_multiple_files_are_all_reported(self, cli, tmp_path, schema_definition):
+        valid = write_schema(tmp_path, schema_definition, "valid.json")
+        invalid = write_schema(
+            tmp_path, {"about_url": "https://example.com"}, "invalid.json"
+        )
 
-        result = cli.invoke(ckan, ["scheming-dynamic", "validate", str(valid), str(invalid)])
+        result = cli.invoke(
+            ckan, ["scheming-dynamic", "validate", str(valid), str(invalid)]
+        )
 
         assert result.exit_code == 1
         assert "OK - no schema violations" in result.output
@@ -82,5 +82,7 @@ class TestValidateCommand:
         assert result.exit_code != 0
 
     def test_nonexistent_file_is_rejected(self, cli):
-        result = cli.invoke(ckan, ["scheming-dynamic", "validate", "/no/such/file.yaml"])
+        result = cli.invoke(
+            ckan, ["scheming-dynamic", "validate", "/no/such/file.yaml"]
+        )
         assert result.exit_code != 0

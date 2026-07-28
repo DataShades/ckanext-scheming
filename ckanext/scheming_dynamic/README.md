@@ -46,7 +46,28 @@ All actions are sysadmin-only.
 
 Definitions are validated against a JSON Schema mirroring the minimal shape
 of a ckanext-scheming schema file; `preset` values are checked against the
-presets registered at startup.
+presets registered at startup, and `form_snippet`/`display_snippet` values
+against the `scheming/form_snippets/*.html` and
+`scheming/display_snippets/*.html` templates found in the registered
+template directories (`null` is allowed to hide a field). Snippets
+referenced by a full path (`myext/snippet.html`) are not supported in
+dynamic schemas.
+
+## Admin UI
+
+Sysadmins get a **Scheming** tab under `/ckan-admin/` (mounted at
+`/ckan-admin/scheming/`) that lists the dynamic dataset schemas and allows
+creating, editing and deleting them. Create/update/delete go through the
+`scheming_schema_*` actions, so the same validation applies and
+`ValidationError`s are shown in the form.
+
+The definition is edited either as raw JSON in a textarea or through a form
+generated from the JSON Schema by [JSON Editor](https://github.com/json-editor/json-editor).
+The generated form supports adding/removing dataset and resource fields,
+reordering them with move up/down buttons and picking `preset` values from
+the registered presets. A **Preview form** button renders the
+current (unsaved) definition with the same form snippets the real
+dataset/resource forms use.
 
 ## Known limitations
 

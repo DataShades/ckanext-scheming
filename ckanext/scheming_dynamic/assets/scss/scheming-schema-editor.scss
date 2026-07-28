@@ -1,0 +1,128 @@
+.scheming-schema-editor-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f2f4f7;
+}
+
+.scheming-schema-preview .scheming-schema-editor-toolbar {
+    border-bottom: 1px solid var(--bs-card-border-color);
+}
+
+.scheming-schema-editor-form select.je-switcher {
+    margin: 0 0 0.25rem 0;
+    background-color: var(--bs-white);
+    padding: 0.5rem 1rem;
+}
+
+.json-editor-btn-collapse {
+    span {
+        display: none;
+    }
+}
+
+.btn-group.je-object__controls .json-editor-btn-edit_properties {
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+
+    span {
+        display: none;
+    }
+}
+
+#scheming-schema-form {
+    .form-label {
+        color: inherit;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 0;
+        display: inline-flex !important;
+    }
+
+    .form-check .form-check-input {
+        height: 1em !important;
+        width: 1em !important;
+    }
+
+    .form-check-label:after {
+        content: "";
+    }
+}
+
+#scheming-schema-form {
+    p {
+        font-size: 0.875em;
+        color: #475467;
+    }
+
+    [data-schemapath="root.dataset_fields"] {
+        margin-bottom: 1rem;
+
+        & > .card > div > .je-object__container {
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--bs-card-border-color);
+            margin-bottom: 1rem;
+        }
+    }
+
+    [data-schemapath^="root.dataset_fields."] .card,
+    [data-schemapath^="root.resource_fields."] .card,
+    [data-schemapath="root"] > .card {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+    }
+
+    .json-editor-btntype-move {
+        span {
+            display: none;
+        }
+    }
+}
+
+#scheming-schema-form .je-modal {
+    background-color: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #212529);
+    border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.15));
+    border-radius: var(--bs-border-radius, 0.375rem);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
+    padding: 0.5rem;
+    z-index: 1050;
+
+    .property-selector {
+        width: 20rem !important;
+        max-height: 16rem !important;
+        padding: 0.25rem !important;
+
+        .form-checkbox {
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--bs-border-radius-sm, 0.25rem);
+
+            &:hover {
+                background-color: var(--bs-tertiary-bg, #f8f9fa);
+            }
+        }
+    }
+
+    .je-edit-json--textarea,
+    textarea {
+        width: 100%;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: var(--bs-border-radius, 0.375rem);
+    }
+
+    .btn {
+        margin-top: 0.5rem;
+        margin-right: 0.25rem;
+    }
+
+    .json-editor-btn-add {
+        float: right;
+    }
+}

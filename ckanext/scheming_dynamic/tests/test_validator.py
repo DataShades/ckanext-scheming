@@ -3,14 +3,8 @@ from __future__ import annotations
 import json
 
 from ckanext.scheming_dynamic.schema import DatasetSchema
+from ckanext.scheming_dynamic.tests.helpers import SCHEMA_DEFINITION
 from ckanext.scheming_dynamic.validator import error_location, iter_errors, load_data
-
-MINIMAL_DATASET = {
-    "about_url": "https://example.com",
-    "dataset_type": "test-type",
-    "dataset_fields": [{"field_name": "title"}],
-    "resource_fields": [{"field_name": "url"}],
-}
 
 
 def errors_for(data):
@@ -19,7 +13,7 @@ def errors_for(data):
 
 class TestIterErrors:
     def test_minimal_valid_schema_has_no_errors(self):
-        assert errors_for(MINIMAL_DATASET) == []
+        assert errors_for(SCHEMA_DEFINITION) == []
 
     def test_missing_root_keys_are_reported(self):
         errors = errors_for({})
@@ -31,18 +25,21 @@ class TestIterErrors:
         assert all(error_location(e) == "<root>" for e in errors)
 
     def test_missing_field_name_is_reported(self):
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"label": "No name here"}]}
+        data = {**SCHEMA_DEFINITION, "dataset_fields": [{"label": "No name here"}]}
         errors = errors_for(data)
-        assert any(error_location(e) == "dataset_fields/0" and "field_name" in e.message for e in errors)
+        assert any(
+            error_location(e) == "dataset_fields/0" and "field_name" in e.message
+            for e in errors
+        )
 
     def test_field_name_wrong_type_is_reported(self):
-        data = {**MINIMAL_DATASET, "dataset_fields": [{"field_name": 123}]}
+        data = {**SCHEMA_DEFINITION, "dataset_fields": [{"field_name": 123}]}
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/field_name" for e in errors)
 
     def test_required_wrong_type_is_reported(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "required": "yes"}],
         }
         errors = errors_for(data)
@@ -50,7 +47,7 @@ class TestIterErrors:
 
     def test_unknown_preset_is_reported(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "preset": "not_a_real_preset"}],
         }
         errors = errors_for(data)
@@ -58,21 +55,23 @@ class TestIterErrors:
 
     def test_known_preset_is_accepted(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "preset": "title"}],
         }
         assert errors_for(data) == []
 
     def test_multilang_label_is_accepted(self):
         data = {
-            **MINIMAL_DATASET,
-            "dataset_fields": [{"field_name": "x", "label": {"en": "Title", "fr": "Titre"}}],
+            **SCHEMA_DEFINITION,
+            "dataset_fields": [
+                {"field_name": "x", "label": {"en": "Title", "fr": "Titre"}}
+            ],
         }
         assert errors_for(data) == []
 
     def test_multilang_label_with_non_string_value_is_rejected(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "label": {"en": "Title", "fr": 5}}],
         }
         errors = errors_for(data)
@@ -80,14 +79,14 @@ class TestIterErrors:
 
     def test_null_label_is_accepted(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "label": None}],
         }
         assert errors_for(data) == []
 
     def test_boolean_choice_label_is_rejected(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [
                 {
                     "field_name": "x",
@@ -97,19 +96,21 @@ class TestIterErrors:
             ],
         }
         errors = errors_for(data)
-        assert any(error_location(e) == "dataset_fields/0/choices/0/label" for e in errors)
+        assert any(
+            error_location(e) == "dataset_fields/0/choices/0/label" for e in errors
+        )
 
     def test_choices_missing_label_is_accepted(self):
         # scheming_choices_label() falls back to `c.get('label', value)`.
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "choices": [{"value": "a"}]}],
         }
         assert errors_for(data) == []
 
     def test_choices_missing_value_is_rejected(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [{"field_name": "x", "choices": [{"label": "A"}]}],
         }
         errors = errors_for(data)
@@ -117,7 +118,7 @@ class TestIterErrors:
 
     def test_choices_with_non_scalar_value_is_accepted(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [
                 {
                     "field_name": "x",
@@ -135,14 +136,14 @@ class TestIterErrors:
     def test_default_accepts_any_scalar_type(self):
         for default in ("abc", 1, True, None):
             data = {
-                **MINIMAL_DATASET,
+                **SCHEMA_DEFINITION,
                 "dataset_fields": [{"field_name": "x", "default": default}],
             }
             assert errors_for(data) == []
 
     def test_unknown_field_keys_are_ignored(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "dataset_fields": [
                 {
                     "field_name": "x",
@@ -183,7 +184,7 @@ class TestErrorLocation:
 
     def test_nested_error_location(self):
         data = {
-            **MINIMAL_DATASET,
+            **SCHEMA_DEFINITION,
             "resource_fields": [{"field_name": "x", "required": "yes"}],
         }
         errors = errors_for(data)

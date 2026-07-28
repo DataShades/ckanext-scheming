@@ -26,7 +26,7 @@ def scheming_schema_exists(
     if SchemingSchema.get(entity_type, schema_type):
         return
 
-    raise tk.Invalid(f"Scheming schema {entity_type}:{schema_type} not found.")
+    raise tk.Invalid(tk._(f"Scheming schema {entity_type}:{schema_type} not found."))
 
 
 def scheming_schema_not_in_use(
@@ -58,8 +58,7 @@ def scheming_schema_not_in_use(
     )
     if in_use:
         raise tk.Invalid(
-            f"Cannot delete schema '{schema_type}': "
-            "datasets of this type still exist."
+            tk._(f"Cannot delete schema '{schema_type}': datasets of this type still exist.")
         )
 
 

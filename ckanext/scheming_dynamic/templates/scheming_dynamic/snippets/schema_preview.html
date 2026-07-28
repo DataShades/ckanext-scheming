@@ -1,0 +1,51 @@
+{#
+  HTML fragment returned by the schema preview endpoint: the dataset and
+  resource form fields rendered with the same snippets the real dataset
+  form uses, or the list of validation errors when the definition cannot
+  be rendered.
+
+  schema         - expanded (presets merged) scheming schema definition
+  licenses       - license options for the license form snippet
+  preview_errors - validation error messages, set instead of schema
+#}
+{% if preview_errors %}
+  <div class="alert alert-danger">
+    <p>{{ _('The definition cannot be previewed:') }}</p>
+    <ul>
+      {% for error in preview_errors %}
+        <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  <h3>{{ _('Dataset form') }}</h3>
+  {% for field in schema.dataset_fields %}
+    {% if field.form_snippet is not none %}
+      {%- snippet 'scheming/snippets/form_field.html',
+        field=field,
+        data={},
+        errors={},
+        licenses=licenses,
+        entity_type='dataset',
+        object_type=schema.dataset_type
+      -%}
+    {% endif %}
+  {% endfor %}
+
+  <hr />
+
+  <h3>{{ _('Resource form') }}</h3>
+  {% for field in schema.resource_fields %}
+    {% if field.form_snippet is not none %}
+      {%- snippet 'scheming/snippets/form_field.html',
+        field=field,
+        data={},
+        errors={},
+        licenses=licenses,
+        entity_type='dataset',
+        object_type=schema.dataset_type,
+        package_id=''
+      -%}
+    {% endif %}
+  {% endfor %}
+{% endif %}

@@ -9,6 +9,8 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError
 
+import ckan.plugins.toolkit as tk
+
 from ckanext.scheming_dynamic.schema import BaseSchema
 
 
@@ -29,4 +31,4 @@ def iter_errors(data: Any, schema: BaseSchema) -> Iterator[ValidationError]:
 
 
 def error_location(error: ValidationError) -> str:
-    return "/".join(str(p) for p in error.absolute_path) or "<root>"
+    return "/".join(str(p) for p in error.absolute_path) or tk._("<root>")

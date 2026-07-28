@@ -3,15 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Self
 
-import ckan.plugins.toolkit as tk
 import sqlalchemy as sa
-from ckan import model
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped
 
+import ckan.plugins.toolkit as tk
+from ckan import model
+
 
 def _current_datetime() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=timezone.utc)  # noqa: UP017
 
 
 class SchemingSchema(tk.BaseModel):
@@ -44,8 +45,12 @@ class SchemingSchema(tk.BaseModel):
         return model.Session.query(cls).filter(cls.entity_type == entity_type).all()
 
     @classmethod
-    def create(cls, entity_type: str, schema_type: str, definition: dict[str, Any]) -> SchemingSchema:
-        row = cls(entity_type=entity_type, schema_type=schema_type, definition=definition)
+    def create(
+        cls, entity_type: str, schema_type: str, definition: dict[str, Any]
+    ) -> SchemingSchema:
+        row = cls(
+            entity_type=entity_type, schema_type=schema_type, definition=definition
+        )
         model.Session.add(row)
         model.Session.commit()
         return row

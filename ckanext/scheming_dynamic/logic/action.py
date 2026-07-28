@@ -38,7 +38,9 @@ def scheming_schema_create(context: Any, data_dict: dict[str, Any]) -> dict[str,
     _validate_definition(definition, entity_type, schema_type)
 
     if SchemingSchema.get(entity_type, schema_type):
-        raise tk.ValidationError({"schema_type": [f"Schema for '{schema_type}' already exists"]})
+        raise tk.ValidationError(
+            {"schema_type": [tk._(f"Schema for '{schema_type}' already exists")]}
+        )
 
     row = SchemingSchema.create(entity_type, schema_type, definition)
 
@@ -64,7 +66,7 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
 
     schema = SchemingSchema.get(entity_type, schema_type)
     if not schema:
-        raise tk.ObjectNotFound(f"Schema for '{schema_type}' not found")
+        raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
     _validate_definition(definition, entity_type, schema_type)
 
@@ -89,7 +91,7 @@ def scheming_schema_delete(context: Any, data_dict: dict[str, Any]) -> bool:
 
     schema = SchemingSchema.get(entity_type, schema_type)
     if not schema:
-        raise tk.ObjectNotFound(f"Schema for '{schema_type}' not found")
+        raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
     schema.delete()
 
@@ -100,7 +102,9 @@ def _validate_definition(definition: Any, entity_type: str, schema_type: str) ->
     schema_cls = SCHEMA_TYPES.get(entity_type)
 
     if not schema_cls:
-        raise tk.ValidationError({"entity_type": [f"Entity type '{entity_type}' is not supported"]})
+        raise tk.ValidationError(
+            {"entity_type": [tk._(f"Entity type '{entity_type}' is not supported")]}
+        )
 
     errors = list(iter_errors(definition, schema_cls()))
 
@@ -109,12 +113,6 @@ def _validate_definition(definition: Any, entity_type: str, schema_type: str) ->
 
     type_field = TYPE_FIELDS[entity_type]
     if definition[type_field] != schema_type:
-        raise tk.ValidationError({"definition": [f"'{type_field}' must match schema_type '{schema_type}'"]})
-
-
-def get_actions():
-    return {
-        "scheming_schema_create": scheming_schema_create,
-        "scheming_schema_update": scheming_schema_update,
-        "scheming_schema_delete": scheming_schema_delete,
-    }
+        raise tk.ValidationError(
+            {"definition": [tk._(f"'{type_field}' must match schema_type '{schema_type}'")]}
+        )

@@ -33,6 +33,8 @@ from ckanext.scheming.plugins import SchemingDatasetsPlugin
 from ckanext.scheming.views import add_paged_form_rules
 from ckanext.scheming_dynamic.model import SchemingSchema
 
+from .admin import bp as admin_bp
+
 DATASET_BP = "scheming_dynamic"
 RESOURCE_BP = "scheming_dynamic_resource"
 
@@ -51,7 +53,7 @@ def get_blueprints() -> list[Blueprint]:
     register_resource_rules(resource_bp)
     resource_bp.before_request(_dynamic_type_or_404)
 
-    return [dataset_bp, resource_bp]
+    return [dataset_bp, resource_bp, admin_bp]
 
 
 def build_dynamic_type_url(
