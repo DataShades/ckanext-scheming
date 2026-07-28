@@ -38,12 +38,6 @@ class TestSchemingSchemaExists:
         with pytest.raises(tk.Invalid, match="not found"):
             call_validator("dataset", "test-type")
 
-    def test_missing_entity_type_defaults_to_dataset(self, schema_definition):
-        SchemingSchema.create("dataset", "test-type", schema_definition)
-
-        data = {("schema_type",): "test-type"}
-        assert scheming_schema_exists(("schema_type",), data, {}, {}) is None
-
 
 @pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
 @pytest.mark.usefixtures("with_plugins", "clean_db")
@@ -68,10 +62,3 @@ class TestSchemingSchemaNotInUse:
         factories.Dataset(type="test-type")
 
         assert self._call_not_in_use_validator("group", "test-type") is None
-
-    def test_missing_entity_type_defaults_to_dataset(self):
-        factories.Dataset(type="test-type")
-
-        data = {("schema_type",): "test-type"}
-        with pytest.raises(tk.Invalid, match="still exist"):
-            scheming_schema_not_in_use(("schema_type",), data, {}, {})

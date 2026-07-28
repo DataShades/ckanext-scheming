@@ -27,10 +27,12 @@ setup(
     install_requires=[
         'pyyaml',
         'ckanapi',
-        'jsonschema',
         'pytz',
         'six',
     ],
+    extras_require={
+        'dynamic': ['jsonschema'],
+    },
     entry_points=\
     """
     [ckan.plugins]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from freezegun import freeze_time
 
 import ckan.plugins.toolkit as tk
 from ckan.lib.plugins import lookup_package_plugin
@@ -152,3 +153,31 @@ class TestDynamicSchemaSync:
         SchemingSchema.create("group", "test-group", schema_definition)
 
         assert "test-group" not in tk.h.scheming_dataset_schemas()
+
+    def test_delete_then_create_at_the_same_instant_is_still_detected(
+        self, schema_definition
+    ):
+        anchor = {**schema_definition, "dataset_type": "anchor"}
+        a = {**schema_definition, "dataset_type": "a"}
+        b = {**schema_definition, "dataset_type": "b"}
+
+        with freeze_time("2024-01-01T00:00:00Z"):
+            helpers.call_action(
+                "scheming_schema_create", schema_type="anchor", definition=anchor
+            )
+            helpers.call_action(
+                "scheming_schema_create", schema_type="a", definition=a
+            )
+
+        # sync once so the fingerprint has "seen" this state
+        assert "a" in tk.h.scheming_dataset_schemas()
+
+        with freeze_time("2024-01-01T00:00:00Z"):
+            helpers.call_action("scheming_schema_delete", schema_type="a")
+            helpers.call_action(
+                "scheming_schema_create", schema_type="b", definition=b
+            )
+
+        schemas = tk.h.scheming_dataset_schemas()
+        assert "b" in schemas
+        assert "a" not in schemas

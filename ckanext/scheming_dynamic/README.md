@@ -9,9 +9,10 @@ a server restart.
   primary key, JSONB `definition`). `schema_type` is a unique entity type (e.g. `dataset_type`)
   and must match the `dataset_type` field inside the definition.
 - Before ckanext-scheming returns any dataset schema it asks this extension
-  whether the table changed since the last merge (a cheap
-  `count(*) + max(updated)` scan, at most once per request). When it did,
-  all dataset schemas are rebuilt: the file-defined schemas from
+  whether anything changed since the last merge — a cheap lookup of a single
+  row in `scheming_schema_state` (one row per entity_type, a version counter
+  bumped on every create/update/delete), at most once per request. When it
+  did, all dataset schemas are rebuilt: the file-defined schemas from
   `scheming.dataset_schemas` overlaid with the database rows. A database
   schema with the same type name as a file schema wins.
 - The check runs per worker process, so changes made through the API
@@ -23,6 +24,10 @@ a server restart.
   catch-all blueprints by a Flask `url_build_error_handler`.
 
 ## Setup
+
+```sh
+pip install ckanext-scheming[dynamic]
+```
 
 ```ini
 ckan.plugins = scheming_datasets scheming_dynamic
@@ -45,13 +50,7 @@ All actions are sysadmin-only.
 - `scheming_schema_delete(schema_type, entity_type="dataset")`
 
 Definitions are validated against a JSON Schema mirroring the minimal shape
-of a ckanext-scheming schema file; `preset` values are checked against the
-presets registered at startup, and `form_snippet`/`display_snippet` values
-against the `scheming/form_snippets/*.html` and
-`scheming/display_snippets/*.html` templates found in the registered
-template directories (`null` is allowed to hide a field). Snippets
-referenced by a full path (`myext/snippet.html`) are not supported in
-dynamic schemas.
+
 
 ## Admin UI
 

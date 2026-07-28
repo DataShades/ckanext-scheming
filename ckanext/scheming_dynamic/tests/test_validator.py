@@ -18,7 +18,7 @@ class TestIterErrors:
     def test_missing_root_keys_are_reported(self):
         errors = errors_for({})
         messages = {e.message for e in errors}
-        assert "'about_url' is a required property" in messages
+        assert "'about' is a required property" in messages
         assert "'dataset_type' is a required property" in messages
         assert "'dataset_fields' is a required property" in messages
         assert "'resource_fields' is a required property" in messages
@@ -159,21 +159,21 @@ class TestIterErrors:
 class TestLoadData:
     def test_load_yaml(self, tmp_path):
         path = tmp_path / "schema.yaml"
-        path.write_text("about_url: https://example.com\ndataset_type: foo\n")
+        path.write_text("about: Example schema\ndataset_type: foo\n")
         assert load_data(path) == {
-            "about_url": "https://example.com",
+            "about": "Example schema",
             "dataset_type": "foo",
         }
 
     def test_load_yml_extension(self, tmp_path):
         path = tmp_path / "schema.yml"
-        path.write_text("about_url: https://example.com\n")
-        assert load_data(path) == {"about_url": "https://example.com"}
+        path.write_text("about: Example schema\n")
+        assert load_data(path) == {"about": "Example schema"}
 
     def test_load_json(self, tmp_path):
         path = tmp_path / "schema.json"
-        path.write_text(json.dumps({"about_url": "https://example.com"}))
-        assert load_data(path) == {"about_url": "https://example.com"}
+        path.write_text(json.dumps({"about": "Example schema"}))
+        assert load_data(path) == {"about": "Example schema"}
 
 
 class TestErrorLocation:

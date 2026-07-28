@@ -15,6 +15,47 @@ def _current_datetime() -> datetime:
     return datetime.now(tz=timezone.utc)  # noqa: UP017
 
 
+class SchemingSchemaState(tk.BaseModel):
+    """Change counter for ``SchemingSchema`` rows, one per entity_type.
+
+    Bumped explicitly by ``SchemingSchema.create``/``update_definition``/
+    ``delete``.
+    """
+
+    __table__ = sa.Table(
+        "scheming_schema_state",
+        tk.BaseModel.metadata,
+        sa.Column("entity_type", sa.Text, primary_key=True),
+        sa.Column("version", sa.Integer, nullable=False, default=0),
+        sa.Column(
+            "updated", sa.TIMESTAMP(timezone=True), nullable=False,
+            default=_current_datetime,
+        ),
+    )
+
+    entity_type: Mapped[str]
+    version: Mapped[int]
+    updated: Mapped[datetime]
+
+    @classmethod
+    def bump(cls, entity_type: str) -> None:
+        row = model.Session.get(cls, entity_type)
+        if row is None:
+            row = cls(entity_type=entity_type, version=0)
+            model.Session.add(row)
+
+        row.version += 1
+        row.updated = _current_datetime()
+
+    @classmethod
+    def fingerprint(cls, entity_type: str) -> tuple[int, datetime | None]:
+        row = model.Session.get(cls, entity_type)
+        if row is None:
+            return 0, None
+
+        return row.version, row.updated
+
+
 class SchemingSchema(tk.BaseModel):
     __table__ = sa.Table(
         "scheming_schema",
@@ -28,7 +69,7 @@ class SchemingSchema(tk.BaseModel):
             default=_current_datetime,
             onupdate=_current_datetime,
         ),
-        sa.Column("definition", JSONB),
+        sa.Column("definition", JSONB, nullable=False),
     )
 
     entity_type: Mapped[str]
@@ -52,15 +93,18 @@ class SchemingSchema(tk.BaseModel):
             entity_type=entity_type, schema_type=schema_type, definition=definition
         )
         model.Session.add(row)
+        SchemingSchemaState.bump(entity_type)
         model.Session.commit()
         return row
 
     def update_definition(self, definition: dict[str, Any]) -> None:
         self.definition = definition
+        SchemingSchemaState.bump(self.entity_type)
         model.Session.commit()
 
     def delete(self) -> None:
         model.Session.delete(self)
+        SchemingSchemaState.bump(self.entity_type)
         model.Session.commit()
 
     def as_dict(self) -> dict[str, Any]:

@@ -17,11 +17,11 @@ def write_schema(tmp_path, data, name="schema.json"):
 @pytest.mark.usefixtures("with_plugins", "with_extended_cli")
 class TestSchemaCommand:
     def test_default_type_is_dataset(self, cli):
-        result = cli.invoke(ckan, ["scheming-dynamic", "schema"])
+        result = cli.invoke(ckan, ["scheming-dynamic", "validation-schema"])
         assert not result.exit_code, result.output
         built = json.loads(result.output)
         assert built["required"] == [
-            "about_url",
+            "about",
             "dataset_type",
             "dataset_fields",
             "resource_fields",
@@ -32,14 +32,16 @@ class TestSchemaCommand:
         [("group", "group_type"), ("organization", "organization_type")],
     )
     def test_type_option(self, cli, schema_type, required_key):
-        result = cli.invoke(ckan, ["scheming-dynamic", "schema", "--type", schema_type])
+        result = cli.invoke(
+            ckan, ["scheming-dynamic", "validation-schema", "--type", schema_type]
+        )
         assert not result.exit_code, result.output
         built = json.loads(result.output)
         assert required_key in built["required"]
 
     def test_invalid_type_option_is_rejected(self, cli):
         result = cli.invoke(
-            ckan, ["scheming-dynamic", "schema", "--type", "not-a-type"]
+            ckan, ["scheming-dynamic", "validation-schema", "--type", "not-a-type"]
         )
         assert result.exit_code != 0
 
@@ -66,7 +68,7 @@ class TestValidateCommand:
     def test_multiple_files_are_all_reported(self, cli, tmp_path, schema_definition):
         valid = write_schema(tmp_path, schema_definition, "valid.json")
         invalid = write_schema(
-            tmp_path, {"about_url": "https://example.com"}, "invalid.json"
+            tmp_path, {"about": "Example schema"}, "invalid.json"
         )
 
         result = cli.invoke(

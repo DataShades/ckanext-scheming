@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 
 from ckanext.scheming_dynamic.schema import (
-    SCHEMA_TYPES,
+    ENTITY_TYPES,
     DatasetSchema,
     GroupSchema,
-    OrganisationSchema,
+    OrganizationSchema,
 )
 
 
@@ -16,10 +16,10 @@ class TestSchemaTypes:
         [
             (
                 DatasetSchema,
-                ["about_url", "dataset_type", "dataset_fields", "resource_fields"],
+                ["about", "dataset_type", "dataset_fields", "resource_fields"],
             ),
-            (GroupSchema, ["about_url", "group_type", "fields"]),
-            (OrganisationSchema, ["about_url", "organization_type", "fields"]),
+            (GroupSchema, ["about", "group_type", "fields"]),
+            (OrganizationSchema, ["about", "organization_type", "fields"]),
         ],
     )
     def test_required_keys(self, schema_cls, expected_required):
@@ -31,7 +31,7 @@ class TestSchemaTypes:
         [
             (DatasetSchema, ["dataset_fields", "resource_fields"]),
             (GroupSchema, ["fields"]),
-            (OrganisationSchema, ["fields"]),
+            (OrganizationSchema, ["fields"]),
         ],
     )
     def test_field_list_properties_reference_shared_field_def(
@@ -42,25 +42,23 @@ class TestSchemaTypes:
             assert built["properties"][key]["items"] == {"$ref": "#/$defs/field"}
 
     def test_registry_matches_classes(self):
-        assert SCHEMA_TYPES["dataset"] is DatasetSchema
-        assert SCHEMA_TYPES["group"] is GroupSchema
-        assert SCHEMA_TYPES["organization"] is OrganisationSchema
+        assert ENTITY_TYPES["dataset"] is DatasetSchema
+        assert ENTITY_TYPES["group"] is GroupSchema
+        assert ENTITY_TYPES["organization"] is OrganizationSchema
 
     def test_common_root_properties_are_shared(self):
-        for schema_cls in SCHEMA_TYPES.values():
+        for schema_cls in ENTITY_TYPES.values():
             props = schema_cls().build()["properties"]
-            assert props["about_url"] == {
+            assert props["about"] == {
                 "type": "string",
-                "format": "uri",
+                "title": "About",
                 "minLength": 1,
             }
-            assert props["about"] == {"type": "string"}
-            assert props["scheming_version"] == {"type": "integer"}
 
     def test_field_def_is_identical_across_schema_types(self):
         built = [
             schema_cls().build()["$defs"]["field"]
-            for schema_cls in SCHEMA_TYPES.values()
+            for schema_cls in ENTITY_TYPES.values()
         ]
         assert all(field_def == built[0] for field_def in built)
 
@@ -86,5 +84,5 @@ class TestSchemaTypes:
 
     def test_schema_is_valid_jsonschema(self):
         jsonschema = pytest.importorskip("jsonschema")
-        for schema_cls in SCHEMA_TYPES.values():
+        for schema_cls in ENTITY_TYPES.values():
             jsonschema.Draft202012Validator.check_schema(schema_cls().build())

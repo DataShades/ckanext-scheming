@@ -16,11 +16,7 @@ def scheming_schema_exists(
     errors: types.FlattenErrorDict,
     context: types.Context,
 ) -> Any:
-    # entity_type may not have passed through its default() validator yet
-    entity_type = data.get(("entity_type",))
-    if entity_type is tk.missing or not entity_type:
-        entity_type = DEFAULT_ENTITY_TYPE
-
+    entity_type = data[("entity_type",)]
     schema_type = data[("schema_type",)]
 
     if SchemingSchema.get(entity_type, schema_type):
@@ -41,9 +37,7 @@ def scheming_schema_not_in_use(
     ``ENTITY_TYPES`` in ``logic/schema.py``), so this is a no-op for any
     other entity_type.
     """
-    entity_type = data.get(("entity_type",))
-    if entity_type is tk.missing or not entity_type:
-        entity_type = DEFAULT_ENTITY_TYPE
+    entity_type = data[("entity_type",)]
 
     if entity_type != DEFAULT_ENTITY_TYPE:
         return

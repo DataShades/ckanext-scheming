@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -71,6 +72,8 @@ class _SchemingMixin(object):
     _schema_urls = tuple()
     _schemas = tuple()
     _expanded_schemas = tuple()
+    _fingerprint: tuple[int, datetime | None] | None = None
+    _pending_fingerprint: tuple[int, datetime | None] | None = None
 
     @run_once_for_caller('_scheming_get_helpers', dict)
     def get_helpers(self):
@@ -102,6 +105,13 @@ class _SchemingMixin(object):
             for preset_path in presets
             for field in _load_schema(preset_path)['presets']
         }
+
+    @classmethod
+    def get_presets(cls, config):
+        """Return the presets registered at startup, loading them if needed."""
+        if cls._presets is None:
+            cls._load_presets(config)
+        return cls._presets
 
     def update_config(self, config):
         if self.instance:

@@ -39,12 +39,24 @@ def scheming_schema_update(
 
 
 @validator_args
-def scheming_schema_delete(
+def scheming_schema_delete(  # noqa: PLR0913
     scheming_schema_not_in_use: types.DataValidator,
+    not_missing: types.Validator,
+    unicode_safe: types.Validator,
+    scheming_schema_exists: types.DataValidator,
+    one_of: types.ValidatorFactory,
+    default: types.ValidatorFactory,
 ) -> types.Schema:
-    schema = scheming_schema_update()
-
-    schema.pop("definition", None)
-    schema["schema_type"].append(scheming_schema_not_in_use)
-
-    return schema
+    return {
+        "schema_type": [
+            not_missing,
+            unicode_safe,
+            scheming_schema_exists,
+            scheming_schema_not_in_use,
+        ],
+        "entity_type": [
+            default(DEFAULT_ENTITY_TYPE),
+            unicode_safe,
+            one_of(ENTITY_TYPES),
+        ],
+    }

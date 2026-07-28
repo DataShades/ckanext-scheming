@@ -1,4 +1,4 @@
-"""Create scheming_schema table
+"""Create scheming_schema table.
 
 Revision ID: 8d447c8244e1
 Revises:

@@ -12,7 +12,7 @@ from ckan import model
 from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import SchemingSchema
-from ckanext.scheming_dynamic.schema import SCHEMA_TYPES
+from ckanext.scheming_dynamic.schema import ENTITY_TYPES
 from ckanext.scheming_dynamic.validator import error_location, iter_errors
 
 ADMIN_BP = "scheming_dynamic_admin"
@@ -33,7 +33,7 @@ def _action_context() -> Any:
 
 
 def _meta_schema() -> dict[str, Any]:
-    return SCHEMA_TYPES[DEFAULT_ENTITY_TYPE]().build()
+    return ENTITY_TYPES[DEFAULT_ENTITY_TYPE]().build()
 
 
 def index() -> str:
@@ -139,7 +139,7 @@ def preview() -> Any:
 
     errors = [
         f"{error_location(e)}: {e.message}"
-        for e in iter_errors(definition, SCHEMA_TYPES[DEFAULT_ENTITY_TYPE]())
+        for e in iter_errors(definition, ENTITY_TYPES[DEFAULT_ENTITY_TYPE]())
     ]
     if errors:
         return _preview_errors(errors)

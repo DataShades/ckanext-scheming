@@ -7,7 +7,7 @@ from ckan.logic import validate
 
 from ckanext.scheming_dynamic.logic import schema
 from ckanext.scheming_dynamic.model import SchemingSchema
-from ckanext.scheming_dynamic.schema import SCHEMA_TYPES
+from ckanext.scheming_dynamic.schema import ENTITY_TYPES
 from ckanext.scheming_dynamic.validator import error_location, iter_errors
 
 TYPE_FIELDS = {
@@ -99,7 +99,7 @@ def scheming_schema_delete(context: Any, data_dict: dict[str, Any]) -> bool:
 
 
 def _validate_definition(definition: Any, entity_type: str, schema_type: str) -> None:
-    schema_cls = SCHEMA_TYPES.get(entity_type)
+    schema_cls = ENTITY_TYPES.get(entity_type)
 
     if not schema_cls:
         raise tk.ValidationError(

@@ -75,7 +75,7 @@ class TestSchemingSchemaCreate:
                 entity_type="group",
                 schema_type="test-group",
                 definition={
-                    "about_url": "https://example.com",
+                    "about": "Example schema",
                     "group_type": "test-group",
                     "fields": [{"field_name": "title"}],
                 },

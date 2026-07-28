@@ -11,9 +11,8 @@ import ckanext.scheming
 class BaseSchema:
     """Base class for dataset, group, and organization schemas.
 
-    Shared root keys (`about_url`, `about`, `scheming_version`) and all
-    field-level $defs. Subclasses add the root keys specific to their
-    schema type.
+    Shared root keys (`about`) and all field-level $defs. Subclasses
+    add the root keys specific to their schema type.
     """
 
     schema_id: str
@@ -90,13 +89,11 @@ class BaseSchema:
         }
 
     def required(self) -> list[str]:
-        return ["about_url"]
+        return ["about"]
 
     def properties(self) -> dict[str, Any]:
         return {
-            "about_url": {"type": "string", "title": tk._("About URL"), "format": "url", "minLength": 1},
-            "about": {"type": "string", "title": tk._("About")},
-            "scheming_version": {"type": "integer", "title": tk._("Scheming version"), "default": 3},
+            "about": {"type": "string", "title": tk._("About"), "minLength": 1},
         }
 
     def defs(self) -> dict[str, Any]:
@@ -107,9 +104,8 @@ class BaseSchema:
             "preset": {
                 "type": "string",
                 "description": tk._(
-                    "Must be one of the presets registered at startup: the "
-                    "built-in ckanext/scheming/presets.json plus any files "
-                    "listed in the scheming.presets config option."
+                    "Must be one of the presets registered at startup via "
+                    "the scheming.presets config option."
                 ),
                 "enum": self._registered_preset_names(),
             },
@@ -180,10 +176,7 @@ class BaseSchema:
         """
         from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
 
-        if _SchemingMixin._presets is None:
-            _SchemingMixin._load_presets(tk.config)
-
-        return sorted(_SchemingMixin._presets)  # type: ignore
+        return sorted(_SchemingMixin.get_presets(tk.config))
 
 
 class DatasetSchema(BaseSchema):
@@ -223,7 +216,7 @@ class GroupSchema(BaseSchema):
         }
 
 
-class OrganisationSchema(BaseSchema):
+class OrganizationSchema(BaseSchema):
     schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/organization_schema.schema.json"
     title = "ckanext-scheming organization schema"
     description = "Validates the minimal shape of a ckanext-scheming organization schema file (YAML or JSON)"
@@ -239,8 +232,8 @@ class OrganisationSchema(BaseSchema):
         }
 
 
-SCHEMA_TYPES: dict[str, type[BaseSchema]] = {
+ENTITY_TYPES: dict[str, type[BaseSchema]] = {
     "dataset": DatasetSchema,
     "group": GroupSchema,
-    "organization": OrganisationSchema,
+    "organization": OrganizationSchema,
 }

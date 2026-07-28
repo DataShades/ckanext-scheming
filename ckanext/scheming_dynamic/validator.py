@@ -15,7 +15,7 @@ from ckanext.scheming_dynamic.schema import BaseSchema
 
 
 def load_data(path: Path) -> Any:
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
 
     if path.suffix in (".yaml", ".yml"):
         return yaml.safe_load(text)
