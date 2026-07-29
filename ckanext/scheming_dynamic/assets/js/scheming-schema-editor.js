@@ -1,5 +1,5 @@
 /* Enhance the schema definition textarea with a form generated from the
- * scheming meta-schema (JSON Editor, loaded from a CDN).
+ * scheming meta-schema (JSON Editor).
  *
  * The textarea stays the source of truth for the POSTed value: the module
  * keeps it in sync and falls back to plain textarea editing when JSON
@@ -44,6 +44,7 @@ ckan.module('scheming-schema-editor', function ($) {
       this.form.addEventListener('submit', this._onSubmit);
       this.toggle.addEventListener('click', this._onToggle);
       this.textarea.addEventListener('input', this._onTextareaInput);
+      this.textarea.addEventListener('paste', this._onPaste);
       if (this.previewButton) {
         this.previewButton.addEventListener('click', this._onPreview);
         this.previewClose.addEventListener('click', this._onPreviewClose);
@@ -88,7 +89,7 @@ ckan.module('scheming-schema-editor', function ($) {
       this.toolbar.appendChild(this.previewButton);
 
       this.previewToolbar = document.createElement('div');
-      this.previewToolbar.className = 'scheming-schema-editor-toolbar p-2';
+      this.previewToolbar.className = 'scheming-schema-editor-toolbar py-2';
 
       this.previewClose = document.createElement('button');
       this.previewClose.type = 'button';
@@ -129,8 +130,28 @@ ckan.module('scheming-schema-editor', function ($) {
       this.textarea.hidden = formMode;
       this.editorHolder.hidden = !formMode;
       this.toggle.textContent = formMode
-        ? this._('Edit as JSON')
+        ? this._('Edit as JSON/YAML')
         : this._('Edit as form');
+    },
+
+    /**
+     * Parse JSON, falling back to YAML so a copy-pasted ckanext-scheming
+     * YAML schema file works too. The JSON error is what gets reported
+     * when both fail, since JSON is the primary expected format.
+     */
+    _parseDefinition: function (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch (jsonErr) {
+        if (typeof window.jsyaml === 'undefined') {
+          throw jsonErr;
+        }
+        try {
+          return window.jsyaml.load(raw);
+        } catch (yamlErr) {
+          throw jsonErr;
+        }
+      }
     },
 
     _onToggle: function () {
@@ -144,7 +165,7 @@ ckan.module('scheming-schema-editor', function ($) {
 
       var parsed;
       try {
-        parsed = JSON.parse(this.textarea.value);
+        parsed = this._parseDefinition(this.textarea.value);
       } catch (err) {
         this._showErrors([this._('Definition is not valid JSON: ') + err.message]);
         return;
@@ -165,6 +186,35 @@ ckan.module('scheming-schema-editor', function ($) {
       }, 300);
     },
 
+    /**
+     * Normalize a pasted YAML schema to JSON right away.
+     */
+    _onPaste: function () {
+      if (this.formMode) {
+        return;
+      }
+
+      var self = this;
+      setTimeout(function () {
+        var raw = self.textarea.value;
+
+        try {
+          JSON.parse(raw);
+          return;
+        } catch (err) {}
+
+        var parsed;
+        try {
+          parsed = self._parseDefinition(raw);
+        } catch (err) {
+          return; // not valid YAML either; normal validation will flag it
+        }
+
+        self.textarea.value = JSON.stringify(parsed, null, 2);
+        self._clearErrors();
+      }, 0);
+    },
+
     _validateTextarea: function () {
       var raw = this.textarea.value.trim();
       if (!raw) {
@@ -173,7 +223,7 @@ ckan.module('scheming-schema-editor', function ($) {
       }
 
       try {
-        JSON.parse(raw);
+        this._parseDefinition(raw);
       } catch (err) {
         this._showErrors(
           [this._('Definition is not valid JSON: ') + err.message],
@@ -186,6 +236,15 @@ ckan.module('scheming-schema-editor', function ($) {
 
     _onSubmit: function (event) {
       if (!this.formMode) {
+        var parsed;
+        try {
+          parsed = this._parseDefinition(this.textarea.value);
+        } catch (err) {
+          event.preventDefault();
+          this._showErrors([this._('Definition is not valid JSON: ') + err.message]);
+          return;
+        }
+        this.textarea.value = JSON.stringify(parsed, null, 2);
         return;
       }
 
