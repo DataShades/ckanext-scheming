@@ -14,17 +14,6 @@
     {{ h.csrf_input() }}
     {{ form.errors(error_summary) }}
 
-    {% if is_new %}
-      {% call form.input('schema_type',
-                         id='field-schema-type',
-                         label=_('Schema type'),
-                         value=data.schema_type,
-                         error=errors.schema_type,
-                         is_required=true) %}
-        {{ form.info(_('The dataset type this schema applies to. Must match the dataset_type inside the definition.')) }}
-      {% endcall %}
-    {% endif %}
-
     {{ form.textarea('definition',
                      id='field-definition',
                      label=_('Schema definition (JSON)'),

@@ -45,7 +45,7 @@ ckan db upgrade -p scheming_dynamic
 
 All actions are sysadmin-only.
 
-- `scheming_schema_create(schema_type, definition, entity_type="dataset")`
+- `scheming_schema_create(definition, entity_type="dataset")` — schema type is taken from the definition's type field
 - `scheming_schema_update(schema_type, definition, entity_type="dataset")`
 - `scheming_schema_delete(schema_type, entity_type="dataset")`
 

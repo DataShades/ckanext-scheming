@@ -57,7 +57,7 @@ class BaseSchema:
         "required": ["field_name"],
         "properties": {
             "field_name": {"type": "string", "minLength": 1, "title": tk._("Field name")},
-            "label": {"$ref": "#/$defs/i18n_text"},
+            "label": {"$ref": "#/$defs/i18n_text", "title": tk._("Label")},
             "required": {"type": "boolean", "title": tk._("Required")},
             "default": {"$ref": "#/$defs/anytype", "title": tk._("Default")},
             "preset": {"$ref": "#/$defs/preset", "title": tk._("Preset")},
@@ -67,6 +67,7 @@ class BaseSchema:
             "choices": {
                 "type": "array",
                 "items": {"$ref": "#/$defs/choice"},
+                "title": tk._("Choices"),
             },
         },
         "additionalProperties": True,

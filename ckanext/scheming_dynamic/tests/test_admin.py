@@ -102,7 +102,6 @@ class TestSchemaCreate:
         )
 
         assert resp.status_code == STATUS_OK
-        assert 'name="schema_type"' in resp.body
         assert 'name="definition"' in resp.body
 
     def test_valid_definition_creates_schema(self, app, schema_definition):
@@ -144,19 +143,6 @@ class TestSchemaCreate:
 
         assert resp.status_code == STATUS_OK
         assert "Could not parse as valid JSON" in resp.body
-
-    def test_schema_type_mismatch_is_reported(self, app, schema_definition):
-        resp = app.post(
-            tk.url_for("scheming_dynamic_admin.new"),
-            headers=_sysadmin_headers(),
-            data={
-                "schema_type": "other-type",
-                "definition": json.dumps(schema_definition),
-            },
-        )
-
-        assert resp.status_code == STATUS_OK
-        assert "must match schema_type" in resp.body
 
     def test_unknown_form_snippet_is_reported(self, app, schema_definition):
         definition = {

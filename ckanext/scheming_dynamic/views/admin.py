@@ -63,16 +63,15 @@ class CreateView(MethodView):
 
     def post(self) -> str | Any:
         data = {
-            "schema_type": tk.request.form.get("schema_type", ""),
             "definition": tk.request.form.get("definition", ""),
         }
 
         try:
-            tk.get_action("scheming_schema_create")(_action_context(), dict(data))
+            row = tk.get_action("scheming_schema_create")(_action_context(), dict(data))
         except tk.ValidationError as e:
             return self.get(data, e.error_dict, e.error_summary)
 
-        tk.h.flash_success(tk._("Schema '{}' created.").format(data["schema_type"]))
+        tk.h.flash_success(tk._("Schema '{}' created.").format(row["schema_type"]))
         return tk.redirect_to(f"{ADMIN_BP}.index")
 
 

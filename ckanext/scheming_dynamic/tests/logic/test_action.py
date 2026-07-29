@@ -14,7 +14,6 @@ class TestSchemingSchemaCreate:
     def test_create_returns_schema_dict(self, schema_definition):
         result = helpers.call_action(
             "scheming_schema_create",
-            schema_type="test-type",
             definition=schema_definition,
         )
 
@@ -26,7 +25,6 @@ class TestSchemingSchemaCreate:
     def test_created_schema_is_persisted(self, schema_definition):
         helpers.call_action(
             "scheming_schema_create",
-            schema_type="test-type",
             definition=schema_definition,
         )
 
@@ -37,33 +35,26 @@ class TestSchemingSchemaCreate:
     def test_duplicate_schema_is_rejected(self, schema_definition):
         helpers.call_action(
             "scheming_schema_create",
-            schema_type="test-type",
             definition=schema_definition,
         )
 
         with pytest.raises(tk.ValidationError) as err:
             helpers.call_action(
                 "scheming_schema_create",
-                schema_type="test-type",
                 definition=schema_definition,
             )
 
         assert "already exists" in str(err.value.error_dict["schema_type"])
 
-    def test_missing_schema_type_is_rejected(self, schema_definition):
-        with pytest.raises(tk.ValidationError):
-            helpers.call_action("scheming_schema_create", definition=schema_definition)
-
     def test_missing_definition_is_rejected(self):
         with pytest.raises(tk.ValidationError):
-            helpers.call_action("scheming_schema_create", schema_type="test-type")
+            helpers.call_action("scheming_schema_create")
 
     def test_invalid_entity_type_is_rejected(self, schema_definition):
         with pytest.raises(tk.ValidationError):
             helpers.call_action(
                 "scheming_schema_create",
                 entity_type="user",
-                schema_type="test-type",
                 definition=schema_definition,
             )
 
@@ -73,7 +64,6 @@ class TestSchemingSchemaCreate:
             helpers.call_action(
                 "scheming_schema_create",
                 entity_type="group",
-                schema_type="test-group",
                 definition={
                     "about": "Example schema",
                     "group_type": "test-group",
@@ -81,23 +71,11 @@ class TestSchemingSchemaCreate:
                 },
             )
 
-    def test_mismatched_definition_type_is_rejected(self, schema_definition):
-        with pytest.raises(tk.ValidationError) as err:
-            helpers.call_action(
-                "scheming_schema_create",
-                schema_type="other-type",
-                definition=schema_definition,
-            )
-
-        assert "must match schema_type" in str(err.value.error_dict["definition"])
-
     def test_empty_definition_is_rejected(self):
         with pytest.raises(tk.ValidationError) as err:
-            helpers.call_action(
-                "scheming_schema_create", schema_type="test-type", definition={}
-            )
+            helpers.call_action("scheming_schema_create", definition={})
 
-        assert "<root>" in err.value.error_dict
+        assert "<root>" in str(err.value.error_dict["definition"])
 
     def test_definition_with_invalid_field_is_rejected(self, schema_definition):
         definition = {
@@ -108,11 +86,10 @@ class TestSchemingSchemaCreate:
         with pytest.raises(tk.ValidationError) as err:
             helpers.call_action(
                 "scheming_schema_create",
-                schema_type="test-type",
                 definition=definition,
             )
 
-        assert "dataset_fields/0" in err.value.error_dict
+        assert "dataset_fields/0" in str(err.value.error_dict["definition"])
 
 
 @pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
@@ -152,7 +129,7 @@ class TestSchemingSchemaUpdate:
             helpers.call_action(
                 "scheming_schema_update", schema_type="test-type", definition={}
             )
-        assert "<root>" in err.value.error_dict
+        assert "<root>" in str(err.value.error_dict["definition"])
 
     def test_update_missing_definition_is_rejected(self, schema_definition):
         SchemingSchema.create("dataset", "test-type", schema_definition)
@@ -197,3 +174,7 @@ class TestSchemingSchemaDelete:
             helpers.call_action("scheming_schema_delete", schema_type="test-type")
 
         assert SchemingSchema.get("dataset", "test-type")
+
+    def test_delete_unsupported_entity_type(self):
+        with pytest.raises(tk.ValidationError, match="Value must be one of"):
+            helpers.call_action("scheming_schema_delete", schema_type="test-type", entity_type="study")

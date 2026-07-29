@@ -48,6 +48,9 @@
   font-size: 0.875em;
   color: #475467;
 }
+#scheming-schema-form p.invalid-feedback {
+  color: #b55457;
+}
 #scheming-schema-form [data-schemapath="root.dataset_fields"] {
   margin-bottom: 1rem;
 }

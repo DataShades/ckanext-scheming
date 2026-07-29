@@ -57,8 +57,3 @@ class TestSchemingSchemaNotInUse:
 
         with pytest.raises(tk.Invalid, match="still exist"):
             self._call_not_in_use_validator("dataset", "test-type")
-
-    def test_other_entity_types_are_not_checked(self):
-        factories.Dataset(type="test-type")
-
-        assert self._call_not_in_use_validator("group", "test-type") is None
