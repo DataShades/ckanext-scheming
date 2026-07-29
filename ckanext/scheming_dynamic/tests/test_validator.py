@@ -116,23 +116,6 @@ class TestIterErrors:
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/choices/0" for e in errors)
 
-    def test_choices_with_non_scalar_value_is_accepted(self):
-        data = {
-            **SCHEMA_DEFINITION,
-            "dataset_fields": [
-                {
-                    "field_name": "x",
-                    "choices": [
-                        {
-                            "value": {"type": "Point", "coordinates": [1, 2]},
-                            "label": "A place",
-                        }
-                    ],
-                }
-            ],
-        }
-        assert errors_for(data) == []
-
     def test_default_accepts_any_scalar_type(self):
         for default in ("abc", 1, True, None):
             data = {

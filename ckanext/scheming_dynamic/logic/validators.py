@@ -19,11 +19,6 @@ def scheming_default_entity_type(
     errors: types.FlattenErrorDict,
     context: types.Context,
 ) -> Any:
-    """Default entity_type as a __before hook.
-
-    Field validators run in alphabetical key order, so "definition" runs
-    before "entity_type" and would otherwise see it unresolved.
-    """
     entity_type_key = ("entity_type",)
     value = data.get(entity_type_key)
 

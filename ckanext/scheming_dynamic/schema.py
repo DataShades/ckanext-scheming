@@ -45,7 +45,7 @@ class BaseSchema:
         "type": "object",
         "required": ["value"],
         "properties": {
-            "value": {"$ref": "#/$defs/anytype"},
+            "value": {"type": "string"},
             "label": {"$ref": "#/$defs/i18n_text"},
         },
         "additionalProperties": True,
