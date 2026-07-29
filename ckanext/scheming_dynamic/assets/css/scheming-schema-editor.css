@@ -15,16 +15,9 @@
   padding: 0.5rem 1rem;
 }
 
-.json-editor-btn-collapse span {
-  display: none;
-}
-
 .btn-group.je-object__controls .json-editor-btn-edit_properties {
   border-top-left-radius: 0.25rem;
   border-bottom-left-radius: 0.25rem;
-}
-.btn-group.je-object__controls .json-editor-btn-edit_properties span {
-  display: none;
 }
 
 #scheming-schema-form .form-label {
@@ -59,6 +52,14 @@
   border-bottom: 1px solid var(--bs-card-border-color);
   margin-bottom: 1rem;
 }
+#scheming-schema-form [data-schemapath="root.dataset_fields"] > .card > div > .je-object__container:last-of-type {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: unset;
+}
+#scheming-schema-form [data-schemapath="root.dataset_fields"] > .card > div > .je-object__container:last-of-type .form-group {
+  margin-bottom: 0;
+}
 #scheming-schema-form [data-schemapath^="root.dataset_fields."] .card,
 #scheming-schema-form [data-schemapath^="root.resource_fields."] .card,
 #scheming-schema-form [data-schemapath=root] > .card {
@@ -68,9 +69,6 @@
   margin: 0;
   padding: 0;
   background: transparent;
-}
-#scheming-schema-form .json-editor-btntype-move span {
-  display: none;
 }
 
 #scheming-schema-form .je-modal {

@@ -115,7 +115,8 @@ ckan.module('scheming-schema-editor', function ($) {
         show_errors: 'interaction',
         disable_edit_json: true,
         prompt_before_delete: true,
-        required_by_default: false
+        remove_button_labels: true,
+        display_required_only: true,
       };
       if (startval) {
         options.startval = startval;

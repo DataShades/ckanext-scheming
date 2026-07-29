@@ -64,6 +64,7 @@ class BaseSchema:
             "form_snippet": {"$ref": "#/$defs/form_snippet", "title": tk._("Form snippet")},
             "display_snippet": {"$ref": "#/$defs/display_snippet", "title": tk._("Display snippet")},
             "help_text": {"$ref": "#/$defs/i18n_text", "title": tk._("Help text")},
+            "form_placeholder": {"$ref": "#/$defs/i18n_text", "title": tk._("Form placeholder")},
             "choices": {
                 "type": "array",
                 "items": {"$ref": "#/$defs/choice"},
