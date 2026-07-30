@@ -56,6 +56,7 @@ class BaseSchema:
         "title": tk._("Field {{i1}}"),
         "required": ["field_name"],
         "x-deactivateNonRequired": True,
+        "x-navWarning": False,
         "properties": {
             "field_name": {
                 "type": "string",
@@ -112,6 +113,7 @@ class BaseSchema:
             "$defs": self.defs(),
             # jedison specific options
             "x-enableCollapseToggle": False,
+            "x-navWarning": False,
         }
 
     def required(self) -> list[str]:
@@ -229,8 +231,16 @@ class DatasetSchema(BaseSchema):
                 "minLength": 1,
                 "pattern": "^[A-z0-9_\\-]+$",
             },
-            "dataset_fields": {**self.FIELD_LIST, "title": tk._("Dataset fields")},
-            "resource_fields": {**self.FIELD_LIST, "title": tk._("Resource fields")},
+            "dataset_fields": {
+                **self.FIELD_LIST,
+                "title": tk._("Dataset fields"),
+                "x-navWarning": False,
+            },
+            "resource_fields": {
+                **self.FIELD_LIST,
+                "title": tk._("Resource fields"),
+                "x-navWarning": False,
+            },
         }
 
 
