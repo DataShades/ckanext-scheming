@@ -19,8 +19,34 @@
   border-bottom: unset;
   padding: 0;
 }
+#scheming-schema-form .jedi-label:after,
+#scheming-schema-form .jedi-legend:after {
+  display: none;
+}
+#scheming-schema-form .jedi-label span,
+#scheming-schema-form .jedi-legend span {
+  margin: 0;
+}
+#scheming-schema-form .jedi-array-item {
+  position: relative;
+}
 #scheming-schema-form .jedi-array-item > .jedi-actions-slot {
   margin-bottom: 1rem;
+  position: absolute;
+  top: 9px;
+  right: 120px;
+  z-index: 100;
+  border-right: 1px solid var(--bs-border-color);
+  padding-right: 0.5rem;
+}
+#scheming-schema-form .modal-dialog .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-content: center;
+}
+#scheming-schema-form .modal-dialog .modal-header .modal-title p {
+  margin: 0;
+  font-weight: 600;
 }
 #scheming-schema-form .jedi-modal-dialog {
   box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
@@ -45,23 +71,6 @@
 }
 #scheming-schema-form .jedi-modal-dialog .jedi-modal-close {
   margin-left: auto;
-}
-#scheming-schema-form .jedi-modal-dialog .jedi-switcher-option-btn {
-  display: block;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  text-align: left;
-  background-color: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.25rem;
-}
-#scheming-schema-form .jedi-modal-dialog .jedi-switcher-option-btn:hover {
-  background-color: #f8f9fa;
-}
-#scheming-schema-form .jedi-modal-dialog .jedi-switcher-option-btn.jedi-switcher-option-active {
-  color: #fff;
-  background-color: #0d6efd;
-  border-color: #0d6efd;
 }
 #scheming-schema-form .jedi-switcher-modal-trigger {
   cursor: pointer;

@@ -23,13 +23,19 @@ class BaseSchema:
 
     I18N_TEXT = {
         "title": tk._("Label"),
-        "description": tk._(
-            "A label/help_text value: a plain string (translated via gettext), an "
-            "object mapping language codes to strings, or null/empty for fields "
-            "that render no visible label (e.g. a hidden field with a custom "
-            "form_snippet). ckanext-scheming's scheming_language_text() helper "
-            "explicitly treats any falsy value as ''."
-        ),
+        "x-info": {
+            "variant": "modal",
+            "title": tk._("About"),
+            "content": tk._(
+                "A label/help\\_text/form\\_placeholder value:\n"
+                "- a plain string, translated via gettext\n"
+                "- an object mapping language codes to strings "
+                "(translations)\n"
+                "- `null`/empty, to render no visible text — for `label` "
+                "specifically, this falls back to `field_name` instead; "
+                "`help_text`/`form_placeholder` just aren't shown\n\n"
+            ),
+        },
         "oneOf": [
             {"x-switcherTitle": tk._("Text"), "type": "string"},
             {
@@ -44,8 +50,9 @@ class BaseSchema:
     CHOICE = {
         "type": "object",
         "required": ["value"],
+        "title": tk._("Choice {{i1}}"),
         "properties": {
-            "value": {"type": "string"},
+            "value": {"type": "string", "title": tk._("Value")},
             "label": {"$ref": "#/$defs/i18n_text"},
         },
         "additionalProperties": True,
@@ -135,6 +142,18 @@ class BaseSchema:
                     "Must be one of the presets registered at startup via "
                     "the scheming.presets config option."
                 ),
+                "x-info": {
+                    "variant": "modal",
+                    "title": tk._("About presets"),
+                    "content": tk._(
+                        "A preset bundles a `form_snippet`, `display_snippet` "
+                        "and validators for a common field shape (dates, "
+                        "markdown, select lists, ...), so you don't have to "
+                        "wire those up by hand.\n\n"
+                        "The list here is whatever plugins registered at "
+                        "startup via the `scheming.presets` config option."
+                    ),
+                },
                 "enum": self._registered_preset_names(),
             },
             "form_snippet": {

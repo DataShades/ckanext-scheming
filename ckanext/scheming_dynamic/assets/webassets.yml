@@ -8,6 +8,7 @@ schema-editor:
     - js/scheming-schema-editor.js
     - js/vendor/jsoneditor.min.js
     - js/vendor/js-yaml.min.js
+    - js/vendor/marked.min.js
 
 schema-editor-css:
   output: ckanext-scheming-dynamic/%(version)s_schema_editor.css

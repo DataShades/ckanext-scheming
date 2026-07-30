@@ -136,7 +136,7 @@ ckan.module('scheming-schema-editor', function ($) {
           enablePropertiesToggle: true,
           btnContents: false,
           switcherInput: 'modal',
-          editJsonData: true
+          parseMarkdown: true
         });
 
         if (startval) {

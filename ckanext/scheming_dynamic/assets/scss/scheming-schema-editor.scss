@@ -11,23 +11,57 @@
     }
 
     // remove card style for root level
-    #collapse-root > .card-body {
+    #collapse-root>.card-body {
         padding: 0;
     }
 
-    div[data-level="0"] > .card {
+    div[data-level="0"]>.card {
         background: none;
         border: unset;
 
-        & > .card-header {
+        &>.card-header {
             background: unset;
             border-bottom: unset;
             padding: 0;
         }
     }
 
-    .jedi-array-item>.jedi-actions-slot {
-        margin-bottom: 1rem;
+    .jedi-label,
+    .jedi-legend {
+        &:after {
+            display: none;
+        }
+
+        span {
+            margin: 0;
+        }
+    }
+
+    .jedi-array-item {
+        position: relative;
+
+        &>.jedi-actions-slot {
+            margin-bottom: 1rem;
+            position: absolute;
+            top: 9px;
+            right: 120px;
+            z-index: 100;
+            border-right: 1px solid var(--bs-border-color);
+            padding-right: 0.5rem;
+        }
+    }
+
+    .modal-dialog {
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-content: center;
+
+            .modal-title p {
+                margin: 0;
+                font-weight: 600;
+            }
+        }
     }
 
     .jedi-modal-dialog {
