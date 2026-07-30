@@ -23,6 +23,4 @@ def upgrade():
 
 
 def downgrade():
-    op.alter_column(
-        "scheming_schema", "definition", existing_type=JSONB, nullable=True
-    )
+    op.alter_column("scheming_schema", "definition", existing_type=JSONB, nullable=True)

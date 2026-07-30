@@ -165,18 +165,14 @@ class TestDynamicSchemaSync:
             helpers.call_action(
                 "scheming_schema_create", schema_type="anchor", definition=anchor
             )
-            helpers.call_action(
-                "scheming_schema_create", schema_type="a", definition=a
-            )
+            helpers.call_action("scheming_schema_create", schema_type="a", definition=a)
 
         # sync once so the fingerprint has "seen" this state
         assert "a" in tk.h.scheming_dataset_schemas()
 
         with freeze_time("2024-01-01T00:00:00Z"):
             helpers.call_action("scheming_schema_delete", schema_type="a")
-            helpers.call_action(
-                "scheming_schema_create", schema_type="b", definition=b
-            )
+            helpers.call_action("scheming_schema_create", schema_type="b", definition=b)
 
         schemas = tk.h.scheming_dataset_schemas()
         assert "b" in schemas

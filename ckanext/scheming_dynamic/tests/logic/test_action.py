@@ -177,4 +177,6 @@ class TestSchemingSchemaDelete:
 
     def test_delete_unsupported_entity_type(self):
         with pytest.raises(tk.ValidationError, match="Value must be one of"):
-            helpers.call_action("scheming_schema_delete", schema_type="test-type", entity_type="study")
+            helpers.call_action(
+                "scheming_schema_delete", schema_type="test-type", entity_type="study"
+            )

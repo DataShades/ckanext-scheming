@@ -29,7 +29,9 @@ class SchemingSchemaState(tk.BaseModel):
         sa.Column("entity_type", sa.Text, primary_key=True),
         sa.Column("version", sa.Integer, nullable=False, default=0),
         sa.Column(
-            "updated", sa.TIMESTAMP(timezone=True), nullable=False,
+            "updated",
+            sa.TIMESTAMP(timezone=True),
+            nullable=False,
             default=_current_datetime,
         ),
     )

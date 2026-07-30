@@ -66,7 +66,11 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
     type_field = TYPE_FIELDS[entity_type]
     if definition[type_field] != schema_type:
         raise tk.ValidationError(
-            {"definition": [tk._(f"'{type_field}' must match schema_type '{schema_type}'")]}
+            {
+                "definition": [
+                    tk._(f"'{type_field}' must match schema_type '{schema_type}'")
+                ]
+            }
         )
 
     schema.update_definition(definition)

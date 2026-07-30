@@ -67,9 +67,7 @@ class TestValidateCommand:
 
     def test_multiple_files_are_all_reported(self, cli, tmp_path, schema_definition):
         valid = write_schema(tmp_path, schema_definition, "valid.json")
-        invalid = write_schema(
-            tmp_path, {"about": "Example schema"}, "invalid.json"
-        )
+        invalid = write_schema(tmp_path, {"about": "Example schema"}, "invalid.json")
 
         result = cli.invoke(
             ckan, ["scheming-dynamic", "validate", str(valid), str(invalid)]

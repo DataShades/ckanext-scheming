@@ -5,6 +5,8 @@ import ckan.plugins.toolkit as tk
 from ckan import model, types
 from ckan.lib.navl.dictization_functions import missing
 
+from ckanext.scheming.errors import SchemingException
+from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import SchemingSchema
 from ckanext.scheming_dynamic.schema import ENTITY_TYPES
@@ -43,6 +45,11 @@ def scheming_definition_valid(
     if errs:
         raise tk.Invalid("; ".join(f"{error_location(e)}: {e.message}" for e in errs))
 
+    try:
+        _expand_schemas({definition["dataset_type"]: definition})
+    except Exception as e:
+        raise tk.Invalid(tk._("Schema cannot be expanded: {}").format(e)) from e
+
 
 def scheming_schema_exists(
     key: types.FlattenKey,
@@ -79,7 +86,9 @@ def scheming_schema_not_in_use(
     )
     if in_use:
         raise tk.Invalid(
-            tk._(f"Cannot delete schema '{schema_type}': datasets of this type still exist.")
+            tk._(
+                f"Cannot delete schema '{schema_type}': datasets of this type still exist."
+            )
         )
 
 

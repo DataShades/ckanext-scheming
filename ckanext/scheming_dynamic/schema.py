@@ -56,15 +56,28 @@ class BaseSchema:
         "title": tk._("Field"),
         "required": ["field_name"],
         "properties": {
-            "field_name": {"type": "string", "minLength": 1, "title": tk._("Field name")},
+            "field_name": {
+                "type": "string",
+                "minLength": 1,
+                "title": tk._("Field name"),
+            },
             "label": {"$ref": "#/$defs/i18n_text", "title": tk._("Label")},
             "required": {"type": "boolean", "title": tk._("Required")},
             "default": {"$ref": "#/$defs/anytype", "title": tk._("Default")},
             "preset": {"$ref": "#/$defs/preset", "title": tk._("Preset")},
-            "form_snippet": {"$ref": "#/$defs/form_snippet", "title": tk._("Form snippet")},
-            "display_snippet": {"$ref": "#/$defs/display_snippet", "title": tk._("Display snippet")},
+            "form_snippet": {
+                "$ref": "#/$defs/form_snippet",
+                "title": tk._("Form snippet"),
+            },
+            "display_snippet": {
+                "$ref": "#/$defs/display_snippet",
+                "title": tk._("Display snippet"),
+            },
             "help_text": {"$ref": "#/$defs/i18n_text", "title": tk._("Help text")},
-            "form_placeholder": {"$ref": "#/$defs/i18n_text", "title": tk._("Form placeholder")},
+            "form_placeholder": {
+                "$ref": "#/$defs/i18n_text",
+                "title": tk._("Form placeholder"),
+            },
             "choices": {
                 "type": "array",
                 "items": {"$ref": "#/$defs/choice"},
@@ -196,7 +209,11 @@ class DatasetSchema(BaseSchema):
     def properties(self) -> dict[str, Any]:
         return {
             **super().properties(),
-            "dataset_type": {"type": "string", "title": tk._("Dataset type"), "minLength": 1},
+            "dataset_type": {
+                "type": "string",
+                "title": tk._("Dataset type"),
+                "minLength": 1,
+            },
             "dataset_fields": self.FIELD_LIST,
             "resource_fields": self.FIELD_LIST,
         }

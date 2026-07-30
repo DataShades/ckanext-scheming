@@ -146,7 +146,10 @@ def preview() -> Any:
     # expand presets the same way scheming does for registered schemas, so
     # the preview uses the exact form snippets the real dataset form will
     dataset_type = definition["dataset_type"]
-    expanded = _expand_schemas({dataset_type: definition})[dataset_type]
+    try:
+        expanded = _expand_schemas({dataset_type: definition})[dataset_type]
+    except Exception as e:
+        return _preview_errors([tk._("Schema cannot be expanded: {}").format(e)])
 
     return tk.render(
         "scheming_dynamic/snippets/schema_preview.html",

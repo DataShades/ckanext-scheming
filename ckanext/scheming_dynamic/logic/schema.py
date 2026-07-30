@@ -23,7 +23,11 @@ def scheming_schema_create(  # noqa: PLR0913
             unicode_safe,
             one_of(ENTITY_TYPES),
         ],
-        "definition": [not_missing, convert_to_json_if_string, scheming_definition_valid],
+        "definition": [
+            not_missing,
+            convert_to_json_if_string,
+            scheming_definition_valid,
+        ],
     }
 
 

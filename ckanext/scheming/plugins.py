@@ -255,7 +255,7 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
 
         try:
             expanded = _expand_schemas(merged)
-        except SchemingException:
+        except Exception:
             log.exception(
                 'unable to expand dynamic dataset schemas, '
                 'keeping the previous ones')
