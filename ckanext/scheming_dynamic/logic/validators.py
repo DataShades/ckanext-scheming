@@ -5,7 +5,6 @@ import ckan.plugins.toolkit as tk
 from ckan import model, types
 from ckan.lib.navl.dictization_functions import missing
 
-from ckanext.scheming.errors import SchemingException
 from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import SchemingSchema
@@ -87,7 +86,8 @@ def scheming_schema_not_in_use(
     if in_use:
         raise tk.Invalid(
             tk._(
-                f"Cannot delete schema '{schema_type}': datasets of this type still exist."
+                f"Cannot delete schema '{schema_type}': datasets of this "
+                "type still exist."
             )
         )
 

@@ -23,6 +23,7 @@
                      is_required=true,
                      attrs={'class': 'form-control',
                             'data-module': 'scheming-schema-editor',
+                            'data-module-lang': h.lang(),
                             'data-module-preview-url': h.url_for('scheming_dynamic_admin.preview')}) }}
 
     <div id="scheming-meta-schema" data-schema="{{ h.dump_json(meta_schema) }}" hidden></div>
@@ -37,24 +38,27 @@
 {% endblock %}
 
 {% block secondary_content %}
-  <div class="module module-narrow module-shallow">
-    <h2 class="module-heading">
-      <i class="fa fa-info-circle"></i>
-      {{ _('Schema definition') }}
-    </h2>
-    <div class="module-content">
-      {% trans %}
-        <p>The definition uses the standard ckanext-scheming format:
-        <code>dataset_type</code>, <code>dataset_fields</code> and
-        <code>resource_fields</code>.</p>
-        <p>Field presets are the ones registered at startup (built-in
-        presets plus any files from the <code>scheming.presets</code>
-        config option).</p>
-        <p>The definition is validated on save; you can also paste an
-        existing schema as raw JSON.</p>
-      {% endtrans %}
+    <div class="module module-narrow module-shallow">
+        <div class="module-group">
+            <h2 class="module-heading">
+                <i class="fa fa-info-circle"></i>
+                {{ _('Schema definition') }}
+            </h2>
+            <div class="module-content">
+                {% trans %}
+                <p>The definition uses the standard ckanext-scheming format:
+                    <code>dataset_type</code>, <code>dataset_fields</code> and
+                    <code>resource_fields</code>.
+                </p>
+                <p>Field presets are the ones registered at startup (built-in
+                    presets plus any files from the <code>scheming.presets</code>
+                    config option).</p>
+                <p>The definition is validated on save; you can also paste an
+                    existing schema as raw JSON.</p>
+                {% endtrans %}
+            </div>
+        </div>
     </div>
-  </div>
 {% endblock %}
 
 {% block scripts %}

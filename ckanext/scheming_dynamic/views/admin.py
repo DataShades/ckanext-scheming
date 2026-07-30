@@ -150,7 +150,7 @@ def preview() -> Any:
 
     try:
         expanded = _expand_schemas({dataset_type: definition})[dataset_type]
-    except Exception as e: # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
         return _preview_errors([tk._("Schema cannot be expanded: {}").format(e)])
 
     # Lets build_dynamic_type_url() resolve this type's URLs (e.g. the slug

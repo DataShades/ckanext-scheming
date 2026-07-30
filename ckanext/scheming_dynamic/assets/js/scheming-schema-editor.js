@@ -7,17 +7,19 @@
  */
 ckan.module('scheming-schema-editor', function ($) {
   return {
+    supportedLanguages: ['en', 'de', 'it', 'es'],
     options: {
-      previewUrl: null
+      previewUrl: null,
+      lang: "en"
     },
-
     initialize: function () {
       $.proxyAll(this, /_on/);
 
-      if (typeof window.JSONEditor === 'undefined') {
+      if (typeof window.Jedison === 'undefined') {
         return;
       }
 
+      this.lang = this.supportedLanguages.includes(this.options.lang) ? this.options.lang : "en";
       this.textarea = this.el.get(0);
       this.form = this.textarea.form;
       this.metaSchema = JSON.parse(
@@ -38,17 +40,20 @@ ckan.module('scheming-schema-editor', function ($) {
       }
 
       this._buildLayout();
-      this._createEditor(startval);
-      this._setFormMode(true);
 
-      this.form.addEventListener('submit', this._onSubmit);
-      this.toggle.addEventListener('click', this._onToggle);
-      this.textarea.addEventListener('input', this._onTextareaInput);
-      this.textarea.addEventListener('paste', this._onPaste);
-      if (this.previewButton) {
-        this.previewButton.addEventListener('click', this._onPreview);
-        this.previewClose.addEventListener('click', this._onPreviewClose);
-      }
+      var self = this;
+      this._createEditor(startval).then(function () {
+        self._setFormMode(true);
+
+        self.form.addEventListener('submit', self._onSubmit);
+        self.toggle.addEventListener('click', self._onToggle);
+        self.textarea.addEventListener('input', self._onTextareaInput);
+        self.textarea.addEventListener('paste', self._onPaste);
+        if (self.previewButton) {
+          self.previewButton.addEventListener('click', self._onPreview);
+          self.previewClose.addEventListener('click', self._onPreviewClose);
+        }
+      });
     },
 
     _buildLayout: function () {
@@ -108,21 +113,36 @@ ckan.module('scheming-schema-editor', function ($) {
       this.form.parentNode.insertBefore(this.previewPane, this.form.nextSibling);
     },
 
+    /**
+     * Create the Jedison editor.
+     *
+     * $refs in the meta-schema (label, preset, dataset_fields items, ...)
+     * only resolve when a populated RefParser is passed to Jedison.Create;
+     * without it every $ref-backed field renders as a type-less switcher.
+     */
     _createEditor: function (startval) {
-      var options = {
-        schema: this.metaSchema,
-        theme: 'bootstrap5',
-        iconlib: 'fontawesome5',
-        show_errors: 'interaction',
-        disable_edit_json: true,
-        prompt_before_delete: true,
-        remove_button_labels: true,
-        display_required_only: true,
-      };
-      if (startval) {
-        options.startval = startval;
-      }
-      this.editor = new window.JSONEditor(this.editorHolder, options);
+      var self = this;
+      var refParser = new Jedison.RefParser();
+
+      return refParser.dereference(this.metaSchema).then(function () {
+        self.editor = new Jedison.Create({
+          container: self.editorHolder,
+          theme: new Jedison.ThemeBootstrap5(),
+          iconLib: 'fontawesome6',
+          language: self.lang,
+          schema: self.metaSchema,
+          refParser: refParser,
+          enableCollapseToggle: true,
+          enablePropertiesToggle: true,
+          btnContents: false,
+          switcherInput: 'modal',
+          editJsonData: true
+        });
+
+        if (startval) {
+          self.editor.setValue(startval);
+        }
+      });
     },
 
     _setFormMode: function (formMode) {
@@ -250,7 +270,8 @@ ckan.module('scheming-schema-editor', function ($) {
 
       this.textarea.value = JSON.stringify(this.editor.getValue(), null, 2);
 
-      var errors = this.editor.validate();
+      this.editor.validate();
+      var errors = this.editor.getErrors();
       if (errors.length) {
         event.preventDefault();
         this._showErrors(errors.map(function (error) {

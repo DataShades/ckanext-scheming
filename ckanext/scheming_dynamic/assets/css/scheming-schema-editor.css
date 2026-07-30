@@ -1,107 +1,78 @@
-.scheming-schema-editor-toolbar {
+#scheming-schema-form .card {
+  --bs-card-bg: transparent;
+}
+#scheming-schema-form .scheming-schema-editor-toolbar {
   position: sticky;
   top: 0;
   z-index: 10;
   background: #f2f4f7;
 }
-
-.scheming-schema-preview .scheming-schema-editor-toolbar {
-  border-bottom: 1px solid var(--bs-card-border-color);
+#scheming-schema-form #collapse-root > .card-body {
+  padding: 0;
 }
-
-.scheming-schema-editor-form select.je-switcher {
-  margin: 0 0 0.25rem 0;
-  background-color: var(--bs-white);
-  padding: 0.5rem 1rem;
+#scheming-schema-form div[data-level="0"] > .card {
+  background: none;
+  border: unset;
 }
-
-.btn-group.je-object__controls .json-editor-btn-edit_properties {
-  border-top-left-radius: 0.25rem;
-  border-bottom-left-radius: 0.25rem;
+#scheming-schema-form div[data-level="0"] > .card > .card-header {
+  background: unset;
+  border-bottom: unset;
+  padding: 0;
 }
-
-#scheming-schema-form .form-label {
-  color: inherit;
-  font-weight: 700;
-  font-size: 1rem;
+#scheming-schema-form .jedi-array-item > .jedi-actions-slot {
+  margin-bottom: 1rem;
 }
-#scheming-schema-form .card-title {
-  margin-bottom: 0;
-  display: inline-flex !important;
+#scheming-schema-form .jedi-modal-dialog {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  color: #212529;
+  border: 1px solid var(--bs-border-color) !important;
+}
+#scheming-schema-form .jedi-modal-dialog .jedi-modal-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+#scheming-schema-form .jedi-modal-dialog .jedi-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem;
+}
+#scheming-schema-form .jedi-modal-dialog .jedi-modal-close {
+  margin-left: auto;
+}
+#scheming-schema-form .jedi-modal-dialog .jedi-switcher-option-btn {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+}
+#scheming-schema-form .jedi-modal-dialog .jedi-switcher-option-btn:hover {
+  background-color: #f8f9fa;
+}
+#scheming-schema-form .jedi-modal-dialog .jedi-switcher-option-btn.jedi-switcher-option-active {
+  color: #fff;
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+#scheming-schema-form .jedi-switcher-modal-trigger {
+  cursor: pointer;
+}
+#scheming-schema-form .form-check .form-check-label:after {
+  display: none;
 }
 #scheming-schema-form .form-check .form-check-input {
   height: 1em !important;
   width: 1em !important;
 }
-#scheming-schema-form .form-check-label:after {
-  content: "";
-}
-
-#scheming-schema-form p {
-  font-size: 0.875em;
-  color: #475467;
-}
-#scheming-schema-form p.invalid-feedback {
-  color: #b55457;
-}
-#scheming-schema-form [data-schemapath="root.dataset_fields"] {
-  margin-bottom: 1rem;
-}
-#scheming-schema-form [data-schemapath="root.dataset_fields"] > .card > div > .je-object__container {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--bs-card-border-color);
-  margin-bottom: 1rem;
-}
-#scheming-schema-form [data-schemapath="root.dataset_fields"] > .card > div > .je-object__container:last-of-type {
-  padding-bottom: 0;
-  margin-bottom: 0;
-  border-bottom: unset;
-}
-#scheming-schema-form [data-schemapath="root.dataset_fields"] > .card > div > .je-object__container:last-of-type .form-group {
-  margin-bottom: 0;
-}
-#scheming-schema-form [data-schemapath^="root.dataset_fields."] .card,
-#scheming-schema-form [data-schemapath^="root.resource_fields."] .card,
-#scheming-schema-form [data-schemapath=root] > .card {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  margin: 0;
-  padding: 0;
-  background: transparent;
-}
-
-#scheming-schema-form .je-modal {
-  background-color: var(--bs-body-bg, #fff);
-  color: var(--bs-body-color, #212529);
-  border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.15));
-  border-radius: var(--bs-border-radius, 0.375rem);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
-  padding: 0.5rem;
-  z-index: 1050;
-}
-#scheming-schema-form .je-modal .property-selector {
-  width: 20rem !important;
-  max-height: 16rem !important;
-  padding: 0.25rem !important;
-}
-#scheming-schema-form .je-modal .property-selector .form-checkbox {
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--bs-border-radius-sm, 0.25rem);
-}
-#scheming-schema-form .je-modal .property-selector .form-checkbox:hover {
-  background-color: var(--bs-tertiary-bg, #f8f9fa);
-}
-#scheming-schema-form .je-modal .je-edit-json--textarea,
-#scheming-schema-form .je-modal textarea {
-  width: 100%;
-  border: 1px solid var(--bs-border-color, #dee2e6);
-  border-radius: var(--bs-border-radius, 0.375rem);
-}
-#scheming-schema-form .je-modal .btn {
-  margin-top: 0.5rem;
-  margin-right: 0.25rem;
-}
-#scheming-schema-form .je-modal .json-editor-btn-add {
-  float: right;
+#scheming-schema-form .jedi-btn:disabled {
+  border: unset;
 }

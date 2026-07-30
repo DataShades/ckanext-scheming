@@ -39,7 +39,10 @@ class TestSchemaTypes:
     ):
         built = schema_cls().build()
         for key in field_list_keys:
-            assert built["properties"][key]["items"] == {"$ref": "#/$defs/field"}
+            assert built["properties"][key]["items"] == {
+                "type": "object",
+                "$ref": "#/$defs/field",
+            }
 
     def test_registry_matches_classes(self):
         assert ENTITY_TYPES["dataset"] is DatasetSchema

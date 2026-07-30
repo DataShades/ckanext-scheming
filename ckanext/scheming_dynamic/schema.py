@@ -31,13 +31,13 @@ class BaseSchema:
             "explicitly treats any falsy value as ''."
         ),
         "oneOf": [
-            {"title": tk._("Text"), "type": "string"},
+            {"x-switcherTitle": tk._("Text"), "type": "string"},
             {
-                "title": tk._("Translations (language code to text)"),
+                "x-switcherTitle": tk._("Translations (language code to text)"),
                 "type": "object",
                 "additionalProperties": {"type": "string"},
             },
-            {"title": tk._("No label"), "type": "null"},
+            {"x-switcherTitle": tk._("No label"), "type": "null"},
         ],
     }
 
@@ -53,16 +53,22 @@ class BaseSchema:
 
     FIELD = {
         "type": "object",
-        "title": tk._("Field"),
+        "title": tk._("Field {{i1}}"),
         "required": ["field_name"],
+        "x-deactivateNonRequired": True,
         "properties": {
             "field_name": {
                 "type": "string",
                 "minLength": 1,
                 "title": tk._("Field name"),
+                "pattern": "^[A-z0-9_\\-]+$",
             },
             "label": {"$ref": "#/$defs/i18n_text", "title": tk._("Label")},
-            "required": {"type": "boolean", "title": tk._("Required"), "format": "checkbox"},
+            "required": {
+                "type": "boolean",
+                "title": tk._("Required"),
+                "x-format": "checkbox",
+            },
             "default": {"$ref": "#/$defs/anytype", "title": tk._("Default")},
             "preset": {"$ref": "#/$defs/preset", "title": tk._("Preset")},
             "form_snippet": {
@@ -87,7 +93,11 @@ class BaseSchema:
         "additionalProperties": True,
     }
 
-    FIELD_LIST = {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/field"}}
+    FIELD_LIST = {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "object", "$ref": "#/$defs/field"},
+    }
 
     def build(self) -> dict[str, Any]:
         return {
@@ -96,11 +106,12 @@ class BaseSchema:
             "title": self.title,
             "description": self.description,
             "type": "object",
-            "options": {"disable_collapse": True},
             "required": self.required(),
             "properties": self.properties(),
             "additionalProperties": True,
             "$defs": self.defs(),
+            # jedison specific options
+            "x-enableCollapseToggle": False,
         }
 
     def required(self) -> list[str]:
@@ -133,11 +144,11 @@ class BaseSchema:
                 ),
                 "oneOf": [
                     {
-                        "title": "Snippet template",
+                        "x-switcherTitle": tk._("Snippet template"),
                         "type": "string",
                         "enum": self._available_snippets("form_snippets"),
                     },
-                    {"title": "Hide field from forms", "type": "null"},
+                    {"x-switcherTitle": tk._("Hide field from forms"), "type": "null"},
                 ],
             },
             "display_snippet": {
@@ -149,11 +160,14 @@ class BaseSchema:
                 ),
                 "oneOf": [
                     {
-                        "title": "Snippet template",
+                        "x-switcherTitle": tk._("Snippet template"),
                         "type": "string",
                         "enum": self._available_snippets("display_snippets"),
                     },
-                    {"title": "Hide field from display pages", "type": "null"},
+                    {
+                        "x-switcherTitle": tk._("Hide field from display pages"),
+                        "type": "null",
+                    },
                 ],
             },
             "field": self.FIELD,
@@ -196,8 +210,8 @@ class BaseSchema:
 
 class DatasetSchema(BaseSchema):
     schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/dataset_schema.schema.json"
-    title = "ckanext-scheming dataset schema"
-    description = "Validates the minimal shape of a ckanext-scheming dataset schema file (YAML or JSON)"
+    title = "Dataset schema"
+    description = "Structural schema for a ckanext-scheming dataset schema definition"
 
     def required(self) -> list[str]:
         return super().required() + [
@@ -213,16 +227,17 @@ class DatasetSchema(BaseSchema):
                 "type": "string",
                 "title": tk._("Dataset type"),
                 "minLength": 1,
+                "pattern": "^[A-z0-9_\\-]+$",
             },
-            "dataset_fields": self.FIELD_LIST,
-            "resource_fields": self.FIELD_LIST,
+            "dataset_fields": {**self.FIELD_LIST, "title": tk._("Dataset fields")},
+            "resource_fields": {**self.FIELD_LIST, "title": tk._("Resource fields")},
         }
 
 
 class GroupSchema(BaseSchema):
     schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/group_schema.schema.json"
     title = "ckanext-scheming group schema"
-    description = "Validates the minimal shape of a ckanext-scheming group schema file (YAML or JSON)"
+    description = "Structural schema for a ckanext-scheming group schema definition"
 
     def required(self) -> list[str]:
         return super().required() + ["group_type", "fields"]
@@ -230,15 +245,21 @@ class GroupSchema(BaseSchema):
     def properties(self) -> dict[str, Any]:
         return {
             **super().properties(),
-            "group_type": {"type": "string", "minLength": 1},
-            "fields": self.FIELD_LIST,
+            "group_type": {
+                "type": "string",
+                "title": tk._("Group type"),
+                "minLength": 1,
+            },
+            "fields": {**self.FIELD_LIST, "title": tk._("Fields")},
         }
 
 
 class OrganizationSchema(BaseSchema):
     schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/organization_schema.schema.json"
     title = "ckanext-scheming organization schema"
-    description = "Validates the minimal shape of a ckanext-scheming organization schema file (YAML or JSON)"
+    description = (
+        "Structural schema for a ckanext-scheming organization schema definition"
+    )
 
     def required(self) -> list[str]:
         return super().required() + ["organization_type", "fields"]
@@ -246,8 +267,12 @@ class OrganizationSchema(BaseSchema):
     def properties(self) -> dict[str, Any]:
         return {
             **super().properties(),
-            "organization_type": {"type": "string", "minLength": 1},
-            "fields": self.FIELD_LIST,
+            "organization_type": {
+                "type": "string",
+                "title": tk._("Organization type"),
+                "minLength": 1,
+            },
+            "fields": {**self.FIELD_LIST, "title": tk._("Fields")},
         }
 
 
