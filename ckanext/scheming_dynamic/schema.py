@@ -62,7 +62,7 @@ class BaseSchema:
                 "title": tk._("Field name"),
             },
             "label": {"$ref": "#/$defs/i18n_text", "title": tk._("Label")},
-            "required": {"type": "boolean", "title": tk._("Required")},
+            "required": {"type": "boolean", "title": tk._("Required"), "format": "checkbox"},
             "default": {"$ref": "#/$defs/anytype", "title": tk._("Default")},
             "preset": {"$ref": "#/$defs/preset", "title": tk._("Preset")},
             "form_snippet": {

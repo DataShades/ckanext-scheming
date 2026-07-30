@@ -90,6 +90,11 @@ def build_dynamic_type_url(
 
 
 def _dynamic_schema_exists(package_type: str) -> bool:
+    # An unsaved schema being previewed (admin.py:preview) has no database
+    # row yet, so it needs this escape hatch to still resolve its own URLs.
+    if package_type == getattr(tk.g, "scheming_dynamic_preview_type", None):
+        return True
+
     try:
         with model.Session.begin_nested():
             return SchemingSchema.get("dataset", package_type) is not None
