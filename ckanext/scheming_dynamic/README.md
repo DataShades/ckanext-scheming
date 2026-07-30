@@ -61,7 +61,7 @@ creating, editing and deleting them. Create/update/delete go through the
 `ValidationError`s are shown in the form.
 
 The definition is edited either as raw JSON in a textarea or through a form
-generated from the JSON Schema by [JSON Editor](https://github.com/json-editor/json-editor).
+generated from the JSON Schema by [react-jsonschema-form](https://github.com/rjsf-team/react-jsonschema-form).
 The generated form supports adding/removing dataset and resource fields,
 reordering them with move up/down buttons and picking `preset` values from
 the registered presets. A **Preview form** button renders the

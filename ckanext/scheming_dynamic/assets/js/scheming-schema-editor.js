@@ -1,9 +1,9 @@
 /* Enhance the schema definition textarea with a form generated from the
- * scheming meta-schema (JSON Editor).
+ * scheming meta-schema (react-jsonschema-form, via window.SchemingReactEditor).
  *
  * The textarea stays the source of truth for the POSTed value: the module
- * keeps it in sync and falls back to plain textarea editing when JSON
- * Editor is unavailable or the current content is not parseable JSON.
+ * keeps it in sync and falls back to plain textarea editing when the React
+ * editor is unavailable or the current content is not parseable JSON.
  */
 ckan.module('scheming-schema-editor', function ($) {
   return {
@@ -14,7 +14,7 @@ ckan.module('scheming-schema-editor', function ($) {
     initialize: function () {
       $.proxyAll(this, /_on/);
 
-      if (typeof window.JSONEditor === 'undefined') {
+      if (typeof window.SchemingReactEditor === 'undefined') {
         return;
       }
 
@@ -109,20 +109,10 @@ ckan.module('scheming-schema-editor', function ($) {
     },
 
     _createEditor: function (startval) {
-      var options = {
+      this.editor = window.SchemingReactEditor.create(this.editorHolder, {
         schema: this.metaSchema,
-        theme: 'bootstrap5',
-        iconlib: 'fontawesome5',
-        show_errors: 'interaction',
-        disable_edit_json: true,
-        prompt_before_delete: true,
-        remove_button_labels: true,
-        display_required_only: true,
-      };
-      if (startval) {
-        options.startval = startval;
-      }
-      this.editor = new window.JSONEditor(this.editorHolder, options);
+        startval: startval
+      });
     },
 
     _setFormMode: function (formMode) {

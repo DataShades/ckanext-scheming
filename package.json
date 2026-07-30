@@ -15,7 +15,9 @@
   },
   "scripts": {
     "build-dynamic-scheming": "gulp buildDynamicScheming",
-    "watch-dynamic-scheming": "gulp watchDynamicScheming"
+    "watch-dynamic-scheming": "gulp watchDynamicScheming",
+    "build-schema-editor": "npm --prefix ckanext/scheming_dynamic/assets-react run build",
+    "dev-schema-editor": "npm --prefix ckanext/scheming_dynamic/assets-react run dev"
   },
   "repository": {
     "type": "git",

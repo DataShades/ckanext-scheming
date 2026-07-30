@@ -105,3 +105,7 @@
 #scheming-schema-form .je-modal .json-editor-btn-add {
   float: right;
 }
+
+.array-item-toolbox .btn-group .btn {
+  flex: unset !important;
+}

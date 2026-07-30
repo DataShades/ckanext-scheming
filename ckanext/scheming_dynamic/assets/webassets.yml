@@ -6,7 +6,7 @@ schema-editor:
       - base/main
   contents:
     - js/scheming-schema-editor.js
-    - js/vendor/jsoneditor.min.js
+    - js/schema-editor-react.min.js
     - js/vendor/js-yaml.min.js
 
 schema-editor-css:

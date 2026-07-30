@@ -125,3 +125,9 @@
         float: right;
     }
 }
+
+.array-item-toolbox {
+    .btn-group .btn {
+        flex: unset !important;
+    }
+}
