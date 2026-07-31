@@ -6,7 +6,7 @@ schema-editor:
       - base/main
   contents:
     - js/scheming-schema-editor.js
-    - js/vendor/jsoneditor.min.js
+    - js/vendor/jedison.umd.js
     - js/vendor/js-yaml.min.js
     - js/vendor/marked.min.js
 
