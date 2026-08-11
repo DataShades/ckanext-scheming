@@ -118,7 +118,6 @@ class BaseSchema:
             "properties": self.properties(),
             "additionalProperties": True,
             "$defs": self.defs(),
-            # jedison specific options
             "x-enableCollapseToggle": False,
             "x-navWarning": False,
         }
@@ -138,31 +137,31 @@ class BaseSchema:
             "choice": self.CHOICE,
             "preset": {
                 "type": "string",
-                "description": tk._(
-                    "Must be one of the presets registered at startup via "
-                    "the scheming.presets config option."
-                ),
                 "x-info": {
                     "variant": "modal",
                     "title": tk._("About presets"),
                     "content": tk._(
-                        "A preset bundles a `form_snippet`, `display_snippet` "
-                        "and validators for a common field shape (dates, "
-                        "markdown, select lists, ...), so you don't have to "
-                        "wire those up by hand.\n\n"
-                        "The list here is whatever plugins registered at "
-                        "startup via the `scheming.presets` config option."
+                        "A preset bundles different field attributes "
+                        "(such as `form_snippet`, `display_snippet`, "
+                        "`validators`, `output_validators`, etc.) "
+                        "so you don't have to wire those up by hand.\n\n"
+                        "Must be one of the presets registered at startup via "
+                        "the `scheming.presets` config option."
                     ),
                 },
                 "enum": self._registered_preset_names(),
             },
             "form_snippet": {
-                "description": tk._(
-                    "Form snippet rendered for the field: one of the "
-                    "scheming/form_snippets/*.html templates available in "
-                    "the registered template directories, or null to hide "
-                    "the field from forms."
-                ),
+                "x-info": {
+                    "variant": "modal",
+                    "title": tk._("About"),
+                    "content": tk._(
+                        "Form snippet rendered for the field: one of the "
+                        "scheming/form_snippets/*.html templates available in "
+                        "the registered template directories, or null to hide "
+                        "the field from forms."
+                    ),
+                },
                 "oneOf": [
                     {
                         "x-switcherTitle": tk._("Snippet template"),
@@ -173,12 +172,16 @@ class BaseSchema:
                 ],
             },
             "display_snippet": {
-                "description": tk._(
-                    "Display snippet rendered for the field: one of the "
-                    "scheming/display_snippets/*.html templates available "
-                    "in the registered template directories, or null to "
-                    "hide the field from display pages."
-                ),
+                "x-info": {
+                    "variant": "modal",
+                    "title": tk._("About"),
+                    "content": tk._(
+                        "Display snippet rendered for the field: one of the "
+                        "scheming/display_snippets/*.html templates available "
+                        "in the registered template directories, or null to "
+                        "hide the field from display pages."
+                    ),
+                },
                 "oneOf": [
                     {
                         "x-switcherTitle": tk._("Snippet template"),
