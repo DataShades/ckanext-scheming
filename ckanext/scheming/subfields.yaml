@@ -53,13 +53,6 @@ dataset_fields:
   - field_name: address
     label: Address
     required: true
-    repeating_subfields:
-    - field_name: street_address
-      label: Street Address
-      required: true
-    - field_name: apartment
-      label: Apartment
-      required: true
   - field_name: city
     label: City
   - field_name: state
