@@ -48,6 +48,9 @@
   margin: 0;
   font-weight: 600;
 }
+#scheming-schema-form .modal-dialog .modal-body {
+  font-weight: normal;
+}
 #scheming-schema-form .jedi-modal-dialog {
   box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   color: #212529;
