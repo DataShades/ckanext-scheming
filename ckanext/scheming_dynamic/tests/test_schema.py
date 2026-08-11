@@ -44,6 +44,50 @@ class TestSchemaTypes:
                 "$ref": "#/$defs/field",
             }
 
+    def test_field_def_has_start_form_page_property(self):
+        field_def = DatasetSchema().build()["$defs"]["field"]
+        assert field_def["properties"]["start_form_page"] == {
+            "$ref": "#/$defs/start_form_page",
+            "title": "Start form page",
+        }
+
+    def test_start_form_page_requires_title_and_description(self):
+        start_form_page = DatasetSchema().build()["$defs"]["start_form_page"]
+        assert start_form_page["required"] == ["title", "description"]
+
+    def test_start_form_page_validates_on_dataset_field(self):
+        jsonschema = pytest.importorskip("jsonschema")
+        built = DatasetSchema().build()
+        instance = {
+            "about": "https://example.com/schema",
+            "dataset_type": "dataset",
+            "dataset_fields": [
+                {
+                    "field_name": "notes",
+                    "start_form_page": {
+                        "title": "Detailed Metadata",
+                        "description": "Improves search and gives useful links",
+                    },
+                },
+            ],
+            "resource_fields": [{"field_name": "url"}],
+        }
+        jsonschema.Draft202012Validator(built).validate(instance)
+
+    def test_start_form_page_missing_description_is_invalid(self):
+        jsonschema = pytest.importorskip("jsonschema")
+        built = DatasetSchema().build()
+        instance = {
+            "about": "https://example.com/schema",
+            "dataset_type": "dataset",
+            "dataset_fields": [
+                {"field_name": "notes", "start_form_page": {"title": "Missing desc"}},
+            ],
+            "resource_fields": [{"field_name": "url"}],
+        }
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.Draft202012Validator(built).validate(instance)
+
     def test_registry_matches_classes(self):
         assert ENTITY_TYPES["dataset"] is DatasetSchema
         assert ENTITY_TYPES["group"] is GroupSchema

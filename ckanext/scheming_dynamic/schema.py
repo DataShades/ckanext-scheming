@@ -122,6 +122,10 @@ class BaseSchema:
                     ),
                 },
             },
+            "start_form_page": {
+                "$ref": "#/$defs/start_form_page",
+                "title": tk._("Start form page"),
+            },
         },
         "additionalProperties": True,
     }
@@ -160,6 +164,33 @@ class BaseSchema:
             "anytype": self.ANYTYPE,
             "i18n_text": self.I18N_TEXT,
             "choice": self.CHOICE,
+            "start_form_page": {
+                "type": "object",
+                "title": tk._("Start form page"),
+                "required": ["title", "description"],
+                "properties": {
+                    "title": {"$ref": "#/$defs/i18n_text", "title": tk._("Title")},
+                    "description": {
+                        "$ref": "#/$defs/i18n_text",
+                        "title": tk._("Description"),
+                    },
+                },
+                "additionalProperties": True,
+                "x-info": {
+                    "variant": "modal",
+                    "title": tk._("About start form page"),
+                    "content": tk._(
+                        "Marks this field as the start of a new page of the "
+                        "dataset creation/editing form, splitting the fields "
+                        "before it and the fields from here on into separate "
+                        "pages.\n\n"
+                        "`title` and `description` are shown for navigation "
+                        "between pages.\n\n"
+                        "Only applies to top-level dataset fields — not "
+                        "resource fields or repeating subfields."
+                    ),
+                },
+            },
             "preset": {
                 "type": "string",
                 "x-info": {
