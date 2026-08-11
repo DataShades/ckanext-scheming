@@ -22,6 +22,7 @@ ckan.module('scheming-schema-editor', function ($) {
       this.lang = this.supportedLanguages.includes(this.options.lang) ? this.options.lang : "en";
       this.textarea = this.el.get(0);
       this.form = this.textarea.form;
+      this.presets = this._loadPresets();
       this.metaSchema = JSON.parse(
         document.getElementById('scheming-meta-schema').dataset.schema
       );
@@ -44,6 +45,9 @@ ckan.module('scheming-schema-editor', function ($) {
       var self = this;
       this._createEditor(startval).then(function () {
         self._setFormMode(true);
+        self.editor.on('change', self._onEditorChange);
+        self.editor.on('instance-change', self._onInstanceChange);
+        self._onEditorChange();
 
         self.form.addEventListener('submit', self._onSubmit);
         self.toggle.addEventListener('click', self._onToggle);
@@ -192,6 +196,7 @@ ckan.module('scheming-schema-editor', function ($) {
       }
       this.editor.setValue(parsed);
       this._setFormMode(true);
+      this._onEditorChange();
     },
 
     _onTextareaInput: function () {
@@ -334,6 +339,166 @@ ckan.module('scheming-schema-editor', function ($) {
     _clearErrors: function () {
       this.errorBox.hidden = true;
       this.errorBox.innerHTML = '';
+    },
+
+    _loadPresets: function () {
+      var el = document.getElementById('scheming-presets');
+      if (!el) {
+        return {};
+      }
+      try {
+        return JSON.parse(el.dataset.presets || '{}');
+      } catch (err) {
+        return {};
+      }
+    },
+
+    /**
+     * Debounced full rescan: safety net for structural changes (array
+     * item add/delete/move, initial load, JSON-mode round trip) where
+     * a single instance's path doesn't tell the whole story.
+     */
+    _onEditorChange: function (e) {
+      clearTimeout(this._presetHintsTimer);
+      var self = this;
+
+      console.log(e);
+      this._presetHintsTimer = setTimeout(function () {
+        self._updatePresetHints();
+      }, 150);
+    },
+
+    /**
+     * Targeted update fired on every 'instance-change'. Object instances
+     * re-emit this event for themselves after any child changes,
+     * so this fires with the field object's own path both when its
+     * preset changes AND when one of its sibling properties (form_snippet,
+     * etc.) is edited.
+     *
+     * No-op for every other path since no ".preset" node exists there.
+     */
+    _onInstanceChange: function (instance) {
+      if (!instance || !instance.path) {
+        return;
+      }
+
+      var self = this;
+      var presetPath = instance.path + '/preset';
+
+      queueMicrotask(function () {
+        var presetNode = self.editorHolder.querySelector('[data-path="' + presetPath + '"]');
+        if (presetNode) {
+          self._renderPresetHint(presetNode);
+        }
+      });
+    },
+
+    _updatePresetHints: function () {
+      var self = this;
+      this.editorHolder.querySelectorAll('[data-path$="/preset"]').forEach(function (node) {
+        self._renderPresetHint(node);
+      });
+    },
+
+    /**
+     * For a given "preset" field's container, show what each value the
+     * selected preset would provide, and whether the field's own value
+     * (set alongside the preset) is overriding it.
+     */
+    _renderPresetHint: function (presetNode) {
+      var path = presetNode.getAttribute('data-path');
+      var fieldPath = path.slice(0, -'/preset'.length);
+
+      var presetInstance = this.editor.getInstance(path);
+      var presetName = presetInstance ? presetInstance.getValue() : null;
+      var presetValues = presetName && this.presets ? this.presets[presetName] : null;
+
+      var hints = presetNode.querySelector('.scheming-preset-hints');
+
+      if (!presetValues) {
+        if (hints) {
+          hints.remove();
+        }
+        return;
+      }
+
+      if (!hints) {
+        hints = document.createElement('div');
+        hints.className = 'scheming-preset-hints';
+        presetNode.appendChild(hints);
+      }
+      hints.innerHTML = '';
+
+      var hintsHeader = document.createElement('h4');
+      hintsHeader.className = 'scheming-preset-hints-header';
+      hintsHeader.textContent = ckan.i18n._('Preset attributes:');
+      hints.appendChild(hintsHeader);
+
+      var self = this;
+      Object.keys(presetValues).sort().forEach(function (key) {
+        hints.appendChild(self._buildPresetHintRow(fieldPath, key, presetValues[key]));
+      });
+    },
+
+    _buildPresetHintRow: function (fieldPath, key, presetValue) {
+      var siblingPath = fieldPath + '/' + key;
+
+      // DOM presence, not instance.isActive/getValue(): oneOf-wrapped
+      // properties overwrite the wrapper's jedison.instances entry with
+      // their branch instance, whose value survives deactivate().
+      var siblingNode = this.editorHolder.querySelector('[data-path="' + siblingPath + '"]');
+      var siblingInstance = siblingNode ? this.editor.getInstance(siblingPath) : null;
+      var overridden = !!(siblingInstance && this._hasValue(siblingInstance.getValue()));
+
+      var row = document.createElement('div');
+      row.className = 'scheming-preset-hint';
+
+      var label = document.createElement('span');
+      label.className = 'scheming-preset-hint-key';
+      label.textContent = key + ': ';
+      row.appendChild(label);
+
+      if (overridden) {
+        row.classList.add('scheming-preset-hint-is-overridden');
+
+        var was = document.createElement('del');
+        was.className = 'scheming-preset-hint-value';
+        was.textContent = this._formatPresetValue(presetValue);
+        row.appendChild(was);
+
+        var now = document.createElement('span');
+        now.className = 'scheming-preset-hint-current';
+        now.textContent = ' ' + this._formatPresetValue(siblingInstance.getValue())
+          + ' (' + this._('your value') + ')';
+        row.appendChild(now);
+      } else {
+        var value = document.createElement('span');
+        value.className = 'scheming-preset-hint-value scheming-preset-hint-inherited';
+        value.textContent = this._formatPresetValue(presetValue) + ' (' + this._('from preset') + ')';
+        row.appendChild(value);
+      }
+
+      return row;
+    },
+
+    _hasValue: function (value) {
+      if (value === undefined || value === null || value === '') {
+        return false;
+      }
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      if (typeof value === 'object') {
+        return Object.keys(value).length > 0;
+      }
+      return true;
+    },
+
+    _formatPresetValue: function (value) {
+      if (value === null || value === undefined || typeof value === 'string') {
+        return String(value);
+      }
+      return JSON.stringify(value);
     }
   };
 });

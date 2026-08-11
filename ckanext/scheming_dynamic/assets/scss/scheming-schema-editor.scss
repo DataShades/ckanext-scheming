@@ -111,4 +111,32 @@
     .jedi-btn:disabled {
         border: unset;
     }
+
+    .scheming-preset-hints {
+        margin-top: .5rem;
+        padding: .5rem .75rem;
+        border-left: 3px solid var(--bs-border-color);
+        font-size: .875rem;
+
+        .scheming-preset-hints-header {
+            color: var(--bs-secondary-color);
+        }
+
+        .scheming-preset-hint {
+            color: var(--bs-secondary-color);
+
+            .scheming-preset-hint-key {
+                font-weight: 600;
+            }
+
+            .scheming-preset-hint-value {
+                color: var(--bs-secondary-color);
+            }
+        }
+    }
+
+    .scheming-preset-hint-is-overridden .scheming-preset-hint-current {
+        color: var(--bs-body-color);
+        font-weight: 600;
+    }
 }

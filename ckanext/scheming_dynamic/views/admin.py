@@ -9,6 +9,7 @@ from flask.views import MethodView
 import ckan.plugins.toolkit as tk
 from ckan import model
 
+from ckanext.scheming.helpers import scheming_get_presets
 from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import SchemingSchema
@@ -36,6 +37,10 @@ def _meta_schema() -> dict[str, Any]:
     return ENTITY_TYPES[DEFAULT_ENTITY_TYPE]().build()
 
 
+def _get_presets() -> dict[str, Any]:
+    return scheming_get_presets() or {}
+
+
 def index() -> str:
     return tk.render(
         "scheming_dynamic/index.html",
@@ -57,6 +62,7 @@ class CreateView(MethodView):
                 "errors": errors or {},
                 "error_summary": error_summary or {},
                 "meta_schema": _meta_schema(),
+                "presets": _get_presets(),
                 "is_new": True,
             },
         )
@@ -100,6 +106,7 @@ class EditView(MethodView):
                 "errors": errors or {},
                 "error_summary": error_summary or {},
                 "meta_schema": _meta_schema(),
+                "presets": _get_presets(),
                 "is_new": False,
                 "schema_type": schema_type,
             },
