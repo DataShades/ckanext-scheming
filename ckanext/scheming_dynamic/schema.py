@@ -97,6 +97,31 @@ class BaseSchema:
                 "items": {"$ref": "#/$defs/choice"},
                 "title": tk._("Choices"),
             },
+            "repeating_label": {
+                "$ref": "#/$defs/i18n_text",
+                "title": tk._("Repeating label"),
+            },
+            "repeating_subfields": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"$ref": "#/$defs/field"},
+                "title": tk._("Repeating subfields"),
+                "x-info": {
+                    "variant": "modal",
+                    "title": tk._("About repeating subfields"),
+                    "content": tk._(
+                        "Makes this field the parent of a repeatable group of "
+                        "subfields (e.g. a list of contacts, each with their "
+                        "own address/phone/etc.), entered the same way as "
+                        "normal fields.\n\n"
+                        "Needs an `IPackageController` plugin with "
+                        "`before_index` to convert repeating subfields into a "
+                        "format solr can index — the built-in "
+                        "`scheming_nerf_index` plugin does this by encoding "
+                        "them as JSON strings."
+                    ),
+                },
+            },
         },
         "additionalProperties": True,
     }

@@ -89,3 +89,30 @@ class TestSchemaTypes:
         jsonschema = pytest.importorskip("jsonschema")
         for schema_cls in ENTITY_TYPES.values():
             jsonschema.Draft202012Validator.check_schema(schema_cls().build())
+
+    def test_repeating_subfields_reference_shared_field_def(self):
+        field_def = DatasetSchema().build()["$defs"]["field"]
+        assert field_def["properties"]["repeating_subfields"]["items"] == {
+            "$ref": "#/$defs/field"
+        }
+
+    def test_repeating_subfields_validate(self):
+        jsonschema = pytest.importorskip("jsonschema")
+        built = DatasetSchema().build()
+        instance = {
+            "about": "https://example.com/schema",
+            "dataset_type": "dataset",
+            "dataset_fields": [
+                {
+                    "field_name": "contacts",
+                    "label": "Contacts",
+                    "repeating_label": "Contact",
+                    "repeating_subfields": [
+                        {"field_name": "address", "label": "Address", "required": True},
+                        {"field_name": "phone", "label": "Phone Number"},
+                    ],
+                },
+            ],
+            "resource_fields": [{"field_name": "url"}],
+        }
+        jsonschema.Draft202012Validator(built).validate(instance)

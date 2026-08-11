@@ -121,5 +121,5 @@ class TestSchemingDefinitionValid:
             {"field_name": "citation", "repeating_subfields": bad_repeating_subfields}
         ]
 
-        with pytest.raises(tk.Invalid, match="cannot be expanded"):
+        with pytest.raises(tk.Invalid, match="is not of type"):
             self.call_definition_validator(schema_definition)
