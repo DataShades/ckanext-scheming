@@ -17,7 +17,7 @@ const DYNAMIC_SCHEMING_CSS = path.join(
 const buildDynamicScheming = () =>
   src(DYNAMIC_SCHEMING_SCSS + "/*.scss")
     .pipe(if_(with_sourcemaps(), sourcemaps.init()))
-    .pipe(sass({ outputStyle: "expanded" }).on("error", sass.logError))
+    .pipe(sass({ outputStyle: "compressed" }).on("error", sass.logError))
     .pipe(if_(with_sourcemaps(), sourcemaps.write()))
     .pipe(rename({ extname: ".css" }))
     .pipe(dest(DYNAMIC_SCHEMING_CSS));
