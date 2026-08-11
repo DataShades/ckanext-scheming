@@ -61,15 +61,13 @@ class BaseSchema:
     FIELD = {
         "type": "object",
         "title": tk._("Field {{i1}}"),
-        "required": ["field_name"],
+        "required": [],
         "x-deactivateNonRequired": True,
         "x-navWarning": False,
         "properties": {
             "field_name": {
                 "type": "string",
-                "minLength": 1,
                 "title": tk._("Field name"),
-                "pattern": "^[A-z0-9_\\-]+$",
             },
             "label": {"$ref": "#/$defs/i18n_text", "title": tk._("Label")},
             "required": {
@@ -250,7 +248,24 @@ class BaseSchema:
                     },
                 ],
             },
-            "field": self.FIELD,
+            "field": {
+                **self.FIELD,
+                "if": {
+                    "required": ["preset"],
+                    "properties": {
+                        "preset": {"enum": self._presets_with_field_name()}
+                    },
+                },
+                "else": {
+                    "required": ["field_name"],
+                    "properties": {
+                        "field_name": {
+                            "minLength": 1,
+                            "pattern": "^[A-z0-9_\\-]+$",
+                        },
+                    },
+                },
+            },
         }
 
     @staticmethod
@@ -278,14 +293,19 @@ class BaseSchema:
 
     @staticmethod
     def _registered_preset_names() -> list[str]:
-        """Return the names of all presets registered at startup.
-
-        Preset names ckanext-scheming itself would accept: the presets
-        loaded at startup from the scheming.presets config option.
-        """
+        """Return the names of all presets registered at startup."""
         from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
 
-        return sorted(_SchemingMixin.get_presets(tk.config))
+        return sorted(_SchemingMixin.get_presets(tk.config) or {})
+
+    @staticmethod
+    def _presets_with_field_name() -> list[str]:
+        """Presets that supply their own `field_name`."""
+        from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
+
+        presets = _SchemingMixin.get_presets(tk.config) or {}
+
+        return sorted(name for name, values in presets.items() if "field_name" in values)
 
 
 class DatasetSchema(BaseSchema):

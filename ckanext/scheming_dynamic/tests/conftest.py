@@ -1,5 +1,6 @@
 import pytest
 
+from ckanext.scheming.plugins import _SchemingMixin
 from ckanext.scheming_dynamic import schema_sync
 from ckanext.scheming_dynamic.tests.helpers import SCHEMA_DEFINITION
 
@@ -19,3 +20,11 @@ def reset_schema_sync():
 @pytest.fixture
 def schema_definition() -> dict:
     return {**SCHEMA_DEFINITION}
+
+
+@pytest.fixture
+def reload_scheming_presets():
+    """Force _SchemingMixin to reload presets from the current config."""
+    _SchemingMixin._presets = None
+    yield
+    _SchemingMixin._presets = None
