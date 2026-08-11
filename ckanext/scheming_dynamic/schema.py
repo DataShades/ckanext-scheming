@@ -288,6 +288,24 @@ class DatasetSchema(BaseSchema):
                 "title": tk._("Resource fields"),
                 "x-navWarning": False,
             },
+            "draft_fields_required": {
+                "type": "boolean",
+                "title": tk._("Draft fields required"),
+                "x-format": "checkbox",
+                "x-info": {
+                    "variant": "modal",
+                    "title": tk._("About draft fields required"),
+                    "content": tk._(
+                        "Whether required fields are enforced while a dataset "
+                        "is still in draft state.\n\n"
+                        "Keep `false` to allow saving dataset and resource "
+                        "metadata even if some required fields are still "
+                        "blank, as long as the dataset hasn't been published "
+                        "yet — needed for required fields on form pages past "
+                        "the first, or to save partially-entered metadata."
+                    ),
+                },
+            },
         }
 
 

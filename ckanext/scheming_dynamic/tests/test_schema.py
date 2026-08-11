@@ -90,6 +90,11 @@ class TestSchemaTypes:
         for schema_cls in ENTITY_TYPES.values():
             jsonschema.Draft202012Validator.check_schema(schema_cls().build())
 
+    def test_draft_fields_required_is_optional_boolean(self):
+        props = DatasetSchema().build()["properties"]
+        assert props["draft_fields_required"]["type"] == "boolean"
+        assert "draft_fields_required" not in DatasetSchema().required()
+
     def test_repeating_subfields_reference_shared_field_def(self):
         field_def = DatasetSchema().build()["$defs"]["field"]
         assert field_def["properties"]["repeating_subfields"]["items"] == {
