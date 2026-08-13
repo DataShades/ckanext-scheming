@@ -116,13 +116,20 @@ class TestIterErrors:
         errors = errors_for(data)
         assert any(error_location(e) == "dataset_fields/0/choices/0" for e in errors)
 
-    def test_default_accepts_any_scalar_type(self):
-        for default in ("abc", 1, True, None):
+    def test_default_accepts_string(self):
+        data = {
+            **SCHEMA_DEFINITION,
+            "dataset_fields": [{"field_name": "x", "default": "abc"}],
+        }
+        assert errors_for(data) == []
+
+    def test_default_rejects_non_string(self):
+        for default in (1, True, None, [], {}):
             data = {
                 **SCHEMA_DEFINITION,
                 "dataset_fields": [{"field_name": "x", "default": default}],
             }
-            assert errors_for(data) == []
+            assert errors_for(data) != []
 
     def test_unknown_field_keys_are_ignored(self):
         data = {

@@ -22,8 +22,6 @@ class BaseSchema:
     title: str
     description: str
 
-    ANYTYPE = {"type": ["string", "number", "boolean", "object", "array", "null"]}
-
     I18N_TEXT = {
         "title": tk._("Label"),
         "x-info": {
@@ -78,7 +76,7 @@ class BaseSchema:
                 "title": tk._("Required"),
                 "x-format": "checkbox",
             },
-            "default": {"$ref": "#/$defs/anytype", "title": tk._("Default")},
+            "default": {"type": "string", "title": tk._("Default")},
             "preset": {"$ref": "#/$defs/preset", "title": tk._("Preset")},
             "form_snippet": {
                 "$ref": "#/$defs/form_snippet",
@@ -162,7 +160,6 @@ class BaseSchema:
 
     def defs(self) -> dict[str, Any]:
         return {
-            "anytype": self.ANYTYPE,
             "i18n_text": self.I18N_TEXT,
             "choice": self.CHOICE,
             "start_form_page": {
