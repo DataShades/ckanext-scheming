@@ -10,6 +10,7 @@ ckan.module('scheming-schema-editor', function ($) {
     supportedLanguages: ['en', 'de', 'it', 'es'],
     options: {
       previewUrl: null,
+      previewKind: "form",
       lang: "en"
     },
     initialize: function () {
@@ -90,7 +91,9 @@ ckan.module('scheming-schema-editor', function ($) {
       this.previewButton = document.createElement('button');
       this.previewButton.type = 'button';
       this.previewButton.className = 'btn btn-secondary btn-sm';
-      this.previewButton.textContent = this._('Preview form');
+      this.previewButton.textContent = this.options.previewKind === 'preset'
+        ? this._('Preview preset')
+        : this._('Preview form');
       this.toolbar.appendChild(this.previewButton);
 
       this.previewToolbar = document.createElement('div');

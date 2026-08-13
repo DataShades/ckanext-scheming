@@ -4,7 +4,7 @@ import pytest
 
 from ckanext.scheming.plugins import DEFAULT_PRESETS
 from ckanext.scheming_dynamic.schema import (
-    ENTITY_TYPES,
+    SCHEMA_CLASSES,
     DatasetSchema,
     GroupSchema,
     OrganizationSchema,
@@ -90,12 +90,12 @@ class TestSchemaTypes:
             jsonschema.Draft202012Validator(built).validate(instance)
 
     def test_registry_matches_classes(self):
-        assert ENTITY_TYPES["dataset"] is DatasetSchema
-        assert ENTITY_TYPES["group"] is GroupSchema
-        assert ENTITY_TYPES["organization"] is OrganizationSchema
+        assert SCHEMA_CLASSES["dataset"] is DatasetSchema
+        assert SCHEMA_CLASSES["group"] is GroupSchema
+        assert SCHEMA_CLASSES["organization"] is OrganizationSchema
 
     def test_common_root_properties_are_shared(self):
-        for schema_cls in ENTITY_TYPES.values():
+        for schema_cls in SCHEMA_CLASSES.values():
             props = schema_cls().build()["properties"]
             assert props["about"] == {
                 "type": "string",
@@ -106,7 +106,7 @@ class TestSchemaTypes:
     def test_field_def_is_identical_across_schema_types(self):
         built = [
             schema_cls().build()["$defs"]["field"]
-            for schema_cls in ENTITY_TYPES.values()
+            for schema_cls in SCHEMA_CLASSES.values()
         ]
         assert all(field_def == built[0] for field_def in built)
 
@@ -132,7 +132,7 @@ class TestSchemaTypes:
 
     def test_schema_is_valid_jsonschema(self):
         jsonschema = pytest.importorskip("jsonschema")
-        for schema_cls in ENTITY_TYPES.values():
+        for schema_cls in SCHEMA_CLASSES.values():
             jsonschema.Draft202012Validator.check_schema(schema_cls().build())
 
     def test_draft_fields_required_is_optional_boolean(self):
@@ -167,7 +167,7 @@ class TestSchemaTypes:
             "properties": {
                 "field_name": {
                     "minLength": 1,
-                    "pattern": "^[A-z0-9_\\-]+$",
+                    "pattern": "^[A-Za-z0-9_\\-]+$",
                 },
             },
         }

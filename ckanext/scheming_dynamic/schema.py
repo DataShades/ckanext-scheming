@@ -3,9 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import ckan.plugins as p
 import ckan.plugins.toolkit as tk
 
 import ckanext.scheming
+from ckanext.scheming.plugins import _SchemingMixin
+from ckanext.scheming_dynamic import sync
 
 
 class BaseSchema:
@@ -252,16 +255,14 @@ class BaseSchema:
                 **self.FIELD,
                 "if": {
                     "required": ["preset"],
-                    "properties": {
-                        "preset": {"enum": self._presets_with_field_name()}
-                    },
+                    "properties": {"preset": {"enum": self._presets_with_field_name()}},
                 },
                 "else": {
                     "required": ["field_name"],
                     "properties": {
                         "field_name": {
                             "minLength": 1,
-                            "pattern": "^[A-z0-9_\\-]+$",
+                            "pattern": "^[A-Za-z0-9_\\-]+$",
                         },
                     },
                 },
@@ -293,19 +294,27 @@ class BaseSchema:
 
     @staticmethod
     def _registered_preset_names() -> list[str]:
-        """Return the names of all presets registered at startup."""
-        from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
+        """Return the names of all presets registered at startup or in the DB."""
+        BaseSchema._sync_dynamic_presets()
 
         return sorted(_SchemingMixin.get_presets(tk.config) or {})
 
     @staticmethod
     def _presets_with_field_name() -> list[str]:
         """Presets that supply their own `field_name`."""
-        from ckanext.scheming.plugins import _SchemingMixin  # noqa: PLC0415
-
+        BaseSchema._sync_dynamic_presets()
         presets = _SchemingMixin.get_presets(tk.config) or {}
 
-        return sorted(name for name, values in presets.items() if "field_name" in values)
+        return sorted(
+            name for name, values in presets.items() if "field_name" in values
+        )
+
+    @staticmethod
+    def _sync_dynamic_presets() -> None:
+        if not p.plugin_loaded("scheming_dynamic"):
+            return
+
+        sync.ensure_presets_synced()
 
 
 class DatasetSchema(BaseSchema):
@@ -327,7 +336,7 @@ class DatasetSchema(BaseSchema):
                 "type": "string",
                 "title": tk._("Dataset type"),
                 "minLength": 1,
-                "pattern": "^[A-z0-9_\\-]+$",
+                "pattern": "^[A-Za-z0-9_\\-]+$",
             },
             "dataset_fields": {
                 **self.FIELD_LIST,
@@ -402,7 +411,73 @@ class OrganizationSchema(BaseSchema):
         }
 
 
-ENTITY_TYPES: dict[str, type[BaseSchema]] = {
+class PresetSchema(BaseSchema):
+    """Schema for a single field preset.
+
+    A preset's ``values`` accept the same attribute bag as a dataset/
+    resource field (validators, form_snippet, display_snippet, classes,
+    choices, even its own ``preset`` to base on another registered preset)
+    since that's exactly what gets merged into a field using it.
+    """
+
+    schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/preset_schema.schema.json"
+    title = "Preset"
+    description = "Structural schema for a ckanext-scheming field preset definition"
+
+    def __init__(self, exclude_preset_name: str | None = None) -> None:
+        self._exclude_preset_name = exclude_preset_name
+
+    def build(self) -> dict[str, Any]:
+        schema = super().build()
+        schema["additionalProperties"] = False
+        schema["x-enablePropertiesToggle"] = False
+        return schema
+
+    def required(self) -> list[str]:
+        return ["preset_name", "values"]
+
+    def properties(self) -> dict[str, Any]:
+        return {
+            "preset_name": {
+                "type": "string",
+                "title": tk._("Preset name"),
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_\\-]+$",
+            },
+            "values": {
+                "type": "object",
+                "title": tk._("Values"),
+                "required": [],
+                "properties": self.FIELD["properties"],
+                "additionalProperties": True,
+                "x-deactivateNonRequired": True,
+                "x-navWarning": False,
+                "x-enableCollapseToggle": False,
+            },
+        }
+
+    def defs(self) -> dict[str, Any]:
+        """Same $defs as a dataset/group/org schema, minus this preset itself.
+
+        Excluding the preset being edited from the `preset` enum only
+        blocks the obvious one-hop self-reference in the form; the
+        `scheming_preset_definition_valid` validator is what actually
+        catches longer cycles.
+        """
+        built = super().defs()
+        if self._exclude_preset_name:
+            built["preset"] = {
+                **built["preset"],
+                "enum": [
+                    name
+                    for name in built["preset"]["enum"]
+                    if name != self._exclude_preset_name
+                ],
+            }
+        return built
+
+
+SCHEMA_CLASSES: dict[str, type[BaseSchema]] = {
     "dataset": DatasetSchema,
     "group": GroupSchema,
     "organization": OrganizationSchema,

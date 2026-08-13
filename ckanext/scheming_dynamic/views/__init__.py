@@ -77,13 +77,13 @@ def build_dynamic_type_url(
     # or the resource blueprint for type "water"): try it as a dataset type
     # first, since that's the type actually registered in the database.
     if _dynamic_schema_exists(name):
-        return flask_url_for(f"{DATASET_BP}.{view}", package_type=name, **values)
+        return flask_url_for(f"{DATASET_BP}.{view}", **{**values, "package_type": name})
 
     if name.endswith("_resource"):
         package_type = name[: -len("_resource")]
         if _dynamic_schema_exists(package_type):
             return flask_url_for(
-                f"{RESOURCE_BP}.{view}", package_type=package_type, **values
+                f"{RESOURCE_BP}.{view}", **{**values, "package_type": package_type}
             )
 
     return None

@@ -1,7 +1,6 @@
 import inspect
 import logging
 import os
-from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -72,8 +71,11 @@ class _SchemingMixin(object):
     _schema_urls = tuple()
     _schemas = tuple()
     _expanded_schemas = tuple()
-    _fingerprint: tuple[int, datetime | None] | None = None
-    _pending_fingerprint: tuple[int, datetime | None] | None = None
+
+    dynamic_scheming: dict[str, dict[str, Any]] = {
+        "schema": {"fingerprint": None, "pending_fingerprint": None},
+        "preset": {"fingerprint": None, "static": None},
+    }
 
     @run_once_for_caller('_scheming_get_helpers', dict)
     def get_helpers(self):
@@ -247,9 +249,9 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
         if not p.plugin_loaded('scheming_dynamic'):
             return
 
-        from ckanext.scheming_dynamic import schema_sync # noqa
+        from ckanext.scheming_dynamic import sync # noqa
 
-        merged = schema_sync.dataset_schemas_if_changed(self._static_schemas)
+        merged = sync.dataset_schemas_if_changed(self._static_schemas)
         if merged is None:
             return
 
@@ -261,7 +263,7 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
                 'keeping the previous ones')
             return
 
-        schema_sync.confirm_applied()
+        sync.confirm_applied()
         self._schemas_value = merged
         self._expanded_value = expanded
         self._dataset_form_pages = _build_dataset_form_pages(expanded)

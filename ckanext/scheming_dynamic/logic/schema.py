@@ -66,3 +66,48 @@ def scheming_schema_delete(  # noqa: PLR0913
             one_of(ENTITY_TYPES),
         ],
     }
+
+
+@validator_args
+def scheming_preset_create(
+    not_missing: types.Validator,
+    convert_to_json_if_string: types.Validator,
+    scheming_preset_definition_valid: types.DataValidator,
+) -> types.Schema:
+    return {
+        "definition": [
+            not_missing,
+            convert_to_json_if_string,
+            scheming_preset_definition_valid,
+        ],
+    }
+
+
+@validator_args
+def scheming_preset_update(
+    not_missing: types.Validator,
+    unicode_safe: types.Validator,
+    scheming_preset_exists: types.DataValidator,
+) -> types.Schema:
+    schema = scheming_preset_create()
+
+    schema["preset_name"] = [not_missing, unicode_safe, scheming_preset_exists]
+
+    return schema
+
+
+@validator_args
+def scheming_preset_delete(
+    scheming_preset_not_in_use: types.DataValidator,
+    not_missing: types.Validator,
+    unicode_safe: types.Validator,
+    scheming_preset_exists: types.DataValidator,
+) -> types.Schema:
+    return {
+        "preset_name": [
+            not_missing,
+            unicode_safe,
+            scheming_preset_exists,
+            scheming_preset_not_in_use,
+        ],
+    }

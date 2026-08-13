@@ -3,6 +3,8 @@
 {% block subtitle %}{{ _('Scheming') }}{% endblock %}
 
 {% block primary_content_inner %}
+  {% snippet 'scheming_dynamic/snippets/tabs.html', active_tab=active_tab %}
+
   {% if schemas %}
     <table class="table table-header table-hover table-striped">
       <thead>
@@ -51,9 +53,11 @@
     <p class="empty">{{ _('No dynamic schemas have been created yet.') }}</p>
   {% endif %}
 
-  <a class="btn btn-primary float-end" href="{% url_for 'scheming_dynamic_admin.new' %}">
-    <i class="fa fa-plus-square"></i> {{ _('Add schema') }}
-  </a>
+  <div class="form-actions">
+    <a class="btn btn-primary float-end" href="{% url_for 'scheming_dynamic_admin.new' %}">
+        <i class="fa fa-plus-square"></i> {{ _('Add schema') }}
+    </a>
+  </div>
 {% endblock %}
 
 {% block secondary_content %}

@@ -24,9 +24,33 @@ def scheming_schema_delete(
     return {"success": False}
 
 
+def scheming_preset_create(
+    context: types.Context, data_dict: types.DataDict
+) -> types.AuthResult:
+    """Only sysadmins can create field presets."""
+    return {"success": False}
+
+
+def scheming_preset_update(
+    context: types.Context, data_dict: types.DataDict
+) -> types.AuthResult:
+    """Only sysadmins can update field presets."""
+    return {"success": False}
+
+
+def scheming_preset_delete(
+    context: types.Context, data_dict: types.DataDict
+) -> types.AuthResult:
+    """Only sysadmins can delete field presets."""
+    return {"success": False}
+
+
 def get_auth_functions():
     return {
         "scheming_schema_create": scheming_schema_create,
         "scheming_schema_update": scheming_schema_update,
         "scheming_schema_delete": scheming_schema_delete,
+        "scheming_preset_create": scheming_preset_create,
+        "scheming_preset_update": scheming_preset_update,
+        "scheming_preset_delete": scheming_preset_delete,
     }

@@ -7,10 +7,14 @@ from ckan.tests import factories
 
 from ckanext.scheming_dynamic.logic.validators import (
     scheming_definition_valid,
+    scheming_preset_definition_valid,
+    scheming_preset_exists,
+    scheming_preset_not_in_use,
     scheming_schema_exists,
     scheming_schema_not_in_use,
 )
 from ckanext.scheming_dynamic.model import SchemingSchema
+from ckanext.scheming_dynamic.tests import factories as scheming_factories
 
 
 @pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
@@ -123,3 +127,128 @@ class TestSchemingDefinitionValid:
 
         with pytest.raises(tk.Invalid, match="is not of type"):
             self.call_definition_validator(schema_definition)
+
+
+@pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
+@pytest.mark.usefixtures("with_plugins", "clean_db")
+class TestSchemingPresetExists:
+    def call_validator(self, preset_name: str) -> None:
+        data = {("preset_name",): preset_name}
+        return scheming_preset_exists(("preset_name",), data, {}, {})
+
+    def test_existing_preset_passes(self, preset_definition):
+        scheming_factories.Preset(
+            preset_name="test-preset", values=preset_definition["values"]
+        )
+
+        assert self.call_validator("test-preset") is None
+
+    def test_missing_preset_raises_invalid(self):
+        with pytest.raises(tk.Invalid, match="not found"):
+            self.call_validator("test-preset")
+
+
+@pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
+@pytest.mark.usefixtures("with_plugins", "clean_db")
+class TestSchemingPresetNotInUse:
+    def _call_not_in_use_validator(self, preset_name: str) -> None:
+        data = {("preset_name",): preset_name}
+        return scheming_preset_not_in_use(("preset_name",), data, {}, {})
+
+    def test_passes_when_unused(self, preset_definition):
+        scheming_factories.Preset(
+            preset_name="test-preset", values=preset_definition["values"]
+        )
+
+        assert self._call_not_in_use_validator("test-preset") is None
+
+    def test_raises_invalid_when_another_preset_bases_on_it(self, preset_definition):
+        scheming_factories.Preset(
+            preset_name="test-preset", values=preset_definition["values"]
+        )
+        scheming_factories.Preset(
+            preset_name="dependent-preset", values={"preset": "test-preset"}
+        )
+
+        with pytest.raises(tk.Invalid, match="dependent-preset"):
+            self._call_not_in_use_validator("test-preset")
+
+    def test_raises_invalid_when_used_by_a_schema(
+        self, preset_definition, schema_definition
+    ):
+        scheming_factories.Preset(
+            preset_name="test-preset", values=preset_definition["values"]
+        )
+        definition = {
+            **schema_definition,
+            "dataset_fields": [{"field_name": "x", "preset": "test-preset"}],
+        }
+        SchemingSchema.create("dataset", "test-type", definition)
+
+        with pytest.raises(tk.Invalid, match="test-type"):
+            self._call_not_in_use_validator("test-preset")
+
+
+@pytest.mark.ckan_config("ckan.plugins", "scheming_dynamic")
+@pytest.mark.usefixtures("with_plugins", "clean_db")
+class TestSchemingPresetDefinitionValid:
+    def call_definition_validator(self, definition: dict) -> None:
+        data = {("definition",): definition}
+        return scheming_preset_definition_valid(("definition",), data, {}, {})
+
+    def test_valid_definition_passes(self, preset_definition):
+        assert self.call_definition_validator(preset_definition) is None
+
+    def test_missing_preset_name_raises_invalid(self):
+        with pytest.raises(tk.Invalid, match="preset_name"):
+            self.call_definition_validator({"values": {}})
+
+    def test_missing_values_raises_invalid(self):
+        with pytest.raises(tk.Invalid, match="values"):
+            self.call_definition_validator({"preset_name": "test-preset"})
+
+    def test_malformed_values_raises_invalid(self, preset_definition):
+        definition = {
+            **preset_definition,
+            "values": {"repeating_subfields": "notalist"},
+        }
+
+        with pytest.raises(tk.Invalid, match="is not of type"):
+            self.call_definition_validator(definition)
+
+    def test_self_reference_on_a_not_yet_created_preset_is_rejected(
+        self, preset_definition
+    ):
+        # "test-preset" isn't registered yet, so it can't be its own base
+        # either way: caught by the preset enum, not the cycle resolver
+        definition = {**preset_definition, "values": {"preset": "test-preset"}}
+
+        with pytest.raises(tk.Invalid, match="is not one of"):
+            self.call_definition_validator(definition)
+
+    def test_unknown_base_raises_invalid(self, preset_definition):
+        definition = {**preset_definition, "values": {"preset": "not-a-real-preset"}}
+
+        with pytest.raises(tk.Invalid, match="not-a-real-preset"):
+            self.call_definition_validator(definition)
+
+    def test_editing_a_preset_into_a_cycle_is_rejected(self, preset_definition):
+        # "test-preset" already exists (no base yet) and "a" already bases on
+        # it, so both currently resolve fine and "a" is a valid enum choice;
+        # editing "test-preset" to base on "a" is what closes the loop, and
+        # is the only way to reach the resolve()-based cycle check, since a
+        # brand new preset can never be a valid base for anything yet
+        scheming_factories.Preset(
+            preset_name="test-preset", values=preset_definition["values"]
+        )
+        scheming_factories.Preset(preset_name="a", values={"preset": "test-preset"})
+
+        definition = {**preset_definition, "values": {"preset": "a"}}
+
+        with pytest.raises(tk.Invalid, match="cycle"):
+            self.call_definition_validator(definition)
+
+    def test_base_on_builtin_preset_passes(self, preset_definition):
+        definition = {**preset_definition, "values": {"preset": "title"}}
+
+        assert self.call_definition_validator(definition) is None

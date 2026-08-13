@@ -1,4 +1,5 @@
-#scheming-schema-form {
+#scheming-schema-form,
+#scheming-preset-form {
     .card {
         --bs-card-bg: transparent;
     }
@@ -7,7 +8,6 @@
         position: sticky;
         top: 0;
         z-index: 10;
-        background: #f2f4f7;
     }
 
     // remove card style for root level

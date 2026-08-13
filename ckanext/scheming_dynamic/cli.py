@@ -5,14 +5,14 @@ from pathlib import Path
 
 import click
 
-from ckanext.scheming_dynamic.schema import ENTITY_TYPES
+from ckanext.scheming_dynamic.schema import SCHEMA_CLASSES
 from ckanext.scheming_dynamic.validator import error_location, iter_errors, load_data
 
 entity_type_option = click.option(
     "-t",
     "--type",
     "entity_type",
-    type=click.Choice(sorted(ENTITY_TYPES)),
+    type=click.Choice(sorted(SCHEMA_CLASSES)),
     default="dataset",
     show_default=True,
     help="Which ckanext-scheming schema shape to build/validate against.",
@@ -33,7 +33,7 @@ def validation_schema(entity_type: str):
 
     ckan scheming-dynamic validation-schema --type dataset > dataset_schema.schema.json
     """
-    click.echo(json.dumps(ENTITY_TYPES[entity_type]().build(), indent=2))
+    click.echo(json.dumps(SCHEMA_CLASSES[entity_type]().build(), indent=2))
 
 
 @scheming_dynamic.command()
@@ -48,7 +48,7 @@ def validate(ctx, entity_type: str, schema_file: list[str]):
     ckan scheming-dynamic validate path/to/schema.yaml [more-schemas.json ...]
     """
     any_errors = False
-    schema_instance = ENTITY_TYPES[entity_type]()
+    schema_instance = SCHEMA_CLASSES[entity_type]()
 
     for f in schema_file:
         data = load_data(Path(f))
