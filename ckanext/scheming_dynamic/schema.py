@@ -434,6 +434,9 @@ class PresetSchema(BaseSchema):
         return ["preset_name", "values"]
 
     def properties(self) -> dict[str, Any]:
+        properties = self.FIELD["properties"]
+        properties.pop("start_form_page", None)
+
         return {
             "preset_name": {
                 "type": "string",
@@ -445,7 +448,7 @@ class PresetSchema(BaseSchema):
                 "type": "object",
                 "title": tk._("Values"),
                 "required": [],
-                "properties": self.FIELD["properties"],
+                "properties": properties,
                 "additionalProperties": True,
                 "x-deactivateNonRequired": True,
                 "x-navWarning": False,
