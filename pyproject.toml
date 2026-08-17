@@ -54,6 +54,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "ckanext/scheming_dynamic/logic/schema.py" = ["PLR0913"]
+"ckanext/scheming_dynamic/tests/**" = ["PLR2004"]
 
 [tool.ruff.format]
 quote-style = "double"

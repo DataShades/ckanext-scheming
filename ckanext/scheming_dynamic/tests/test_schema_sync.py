@@ -8,7 +8,7 @@ from ckan.lib.plugins import lookup_package_plugin
 from ckan.tests import helpers
 
 from ckanext.scheming.plugins import SchemingDatasetsPlugin
-from ckanext.scheming_dynamic.model import SchemingSchema
+from ckanext.scheming_dynamic.model import SchemingSchemaVersion
 
 
 @pytest.fixture
@@ -165,12 +165,12 @@ class TestDynamicSchemaSync:
         assert "form_snippet" in schema["dataset_fields"][0]
 
     def test_dynamic_type_is_listed_in_package_types(self, schema_definition):
-        SchemingSchema.create("dataset", "test-type", schema_definition)
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
 
         assert "test-type" in helpers.call_action("scheming_dataset_schema_list")
 
     def test_group_rows_do_not_leak_into_dataset_schemas(self, schema_definition):
-        SchemingSchema.create("group", "test-group", schema_definition)
+        SchemingSchemaVersion.create("group", "test-group", schema_definition)
 
         assert "test-group" not in tk.h.scheming_dataset_schemas()
 

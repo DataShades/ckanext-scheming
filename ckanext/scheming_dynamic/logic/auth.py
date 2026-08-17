@@ -45,11 +45,19 @@ def scheming_preset_delete(
     return {"success": False}
 
 
+def scheming_schema_activity_list(
+    context: types.Context, data_dict: types.DataDict
+) -> types.AuthResult:
+    """Only sysadmins can view dynamic schema history."""
+    return {"success": False}
+
+
 def get_auth_functions():
     return {
         "scheming_schema_create": scheming_schema_create,
         "scheming_schema_update": scheming_schema_update,
         "scheming_schema_delete": scheming_schema_delete,
+        "scheming_schema_activity_list": scheming_schema_activity_list,
         "scheming_preset_create": scheming_preset_create,
         "scheming_preset_update": scheming_preset_update,
         "scheming_preset_delete": scheming_preset_delete,

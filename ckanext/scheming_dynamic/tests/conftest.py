@@ -2,7 +2,7 @@ import pytest
 
 from ckanext.scheming.plugins import _SchemingMixin
 from ckanext.scheming_dynamic import sync
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchema
+from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
 from ckanext.scheming_dynamic.tests import factories
 from ckanext.scheming_dynamic.tests.helpers import PRESET_DEFINITION, SCHEMA_DEFINITION
 
@@ -37,8 +37,8 @@ def reload_scheming_presets():
 
 
 @pytest.fixture
-def dataset_schema(schema_definition: dict) -> SchemingSchema:
-    return SchemingSchema.create(
+def dataset_schema(schema_definition: dict) -> SchemingSchemaVersion:
+    return SchemingSchemaVersion.create(
         "dataset", schema_definition["dataset_type"], schema_definition
     )
 

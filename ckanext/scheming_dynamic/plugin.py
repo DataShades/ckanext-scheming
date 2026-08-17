@@ -4,11 +4,12 @@ from typing import Any, cast
 
 import ckan.plugins as p
 import ckan.plugins.toolkit as tk
-from ckan import types
+from ckan import model, types
 from ckan.common import CKANConfig
 
 from ckanext.scheming_dynamic import views
 from ckanext.scheming_dynamic.cli import get_commands
+from ckanext.scheming_dynamic.utils import ensure_pinned
 
 
 @tk.blanket.actions
@@ -16,10 +17,13 @@ from ckanext.scheming_dynamic.cli import get_commands
 @tk.blanket.auth_functions
 @tk.blanket.validators
 @tk.blanket.blueprints(views.get_blueprints)
+@tk.blanket.helpers
 class SchemingDynamicPlugin(p.SingletonPlugin):
-    # TODO: can we use blanket or we want to support old CKAN versions?
     p.implements(p.IMiddleware, inherit=True)
     p.implements(p.IConfigurer)
+    p.implements(p.IPackageController, inherit=True)
+    p.implements(p.IGroupController, inherit=True)
+    p.implements(p.IOrganizationController, inherit=True)
 
     # IConfigurer
 
@@ -39,3 +43,20 @@ class SchemingDynamicPlugin(p.SingletonPlugin):
                 )
             )
         return app
+
+    # IPackageController / IGroupController / IOrganizationController
+
+    def create(self, entity: "model.Package | model.Group") -> None:
+        """Pin an entity to the schema's current head version.
+
+        All three interfaces declare a same-named create(entity) hook, so a
+        single plugin implementing all of them needs one dispatching method
+        rather than three same-named defs (the last one would silently win
+        and get called for every entity type).
+        """
+        if isinstance(entity, model.Group):
+            entity_type = "organization" if entity.is_organization else "group"
+        else:
+            entity_type = "dataset"
+
+        ensure_pinned(entity_type, entity.id, entity.type)

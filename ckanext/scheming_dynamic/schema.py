@@ -434,8 +434,9 @@ class PresetSchema(BaseSchema):
         return ["preset_name", "values"]
 
     def properties(self) -> dict[str, Any]:
-        properties = self.FIELD["properties"]
-        properties.pop("start_form_page", None)
+        properties = {
+            k: v for k, v in self.FIELD["properties"].items() if k != "start_form_page"
+        }
 
         return {
             "preset_name": {

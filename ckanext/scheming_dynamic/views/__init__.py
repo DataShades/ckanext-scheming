@@ -31,7 +31,7 @@ from ckan.views.resource import resource
 
 from ckanext.scheming.plugins import SchemingDatasetsPlugin
 from ckanext.scheming.views import add_paged_form_rules
-from ckanext.scheming_dynamic.model import SchemingSchema
+from ckanext.scheming_dynamic.model import SchemingSchemaVersion
 
 from .admin import bp as admin_bp
 
@@ -97,7 +97,7 @@ def _dynamic_schema_exists(package_type: str) -> bool:
 
     try:
         with model.Session.begin_nested():
-            return SchemingSchema.get("dataset", package_type) is not None
+            return SchemingSchemaVersion.head_version("dataset", package_type) > 0
     except DBAPIError:
         return False
 
@@ -106,7 +106,9 @@ def _dynamic_type_or_404() -> None:
     view_args = tk.request.view_args or {}
     package_type = view_args.get("package_type")
 
-    if not package_type or not SchemingSchema.get("dataset", package_type):
+    if not package_type or not SchemingSchemaVersion.head_version(
+        "dataset", package_type
+    ):
         tk.abort(404, tk._("Dataset type not found"))
 
     _sync_scheming_datasets_plugin()

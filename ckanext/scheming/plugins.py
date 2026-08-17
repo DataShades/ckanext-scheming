@@ -338,6 +338,10 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
                 "Unsupported dataset type: {t}".format(t=t)]}
 
         scheming_schema = self._expanded_schemas[t]
+        if action_type in ('update', 'show') and p.plugin_loaded('scheming_dynamic'):
+            from ckanext.scheming_dynamic import sync  # noqa
+            if pinned := sync.pinned_expanded_schema('dataset', t, data_dict.get('id')):
+                scheming_schema = pinned
 
         before = scheming_schema.get('before_validators')
         after = scheming_schema.get('after_validators')

@@ -9,6 +9,7 @@ AUTH_FUNCTIONS = [
     "scheming_schema_create",
     "scheming_schema_update",
     "scheming_schema_delete",
+    "scheming_schema_activity_list",
 ]
 
 PRESET_AUTH_FUNCTIONS = [

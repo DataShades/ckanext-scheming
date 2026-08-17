@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 
 import ckan.plugins.toolkit as tk
-from ckan.tests import factories
+from ckan.tests import factories, helpers
 
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchema
+from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
 from ckanext.scheming_dynamic.tests import factories as scheming_factories
 
 STATUS_OK = 200
@@ -134,7 +134,7 @@ class TestSchemaCreate:
         )
 
         assert resp.status_code == STATUS_REDIRECT
-        assert SchemingSchema.get("dataset", "test-type") is not None
+        assert SchemingSchemaVersion.head("dataset", "test-type") is not None
 
     def test_missing_field_name_is_reported(self, app, schema_definition):
         definition = {**schema_definition, "dataset_fields": [{"label": "No name"}]}
@@ -150,7 +150,7 @@ class TestSchemaCreate:
 
         assert resp.status_code == STATUS_OK
         assert "is a required property" in resp.body
-        assert SchemingSchema.get("dataset", "test-type") is None
+        assert SchemingSchemaVersion.head("dataset", "test-type") is None
 
     def test_malformed_json_is_reported(self, app):
         resp = app.post(
@@ -181,7 +181,7 @@ class TestSchemaCreate:
 
         assert resp.status_code == STATUS_OK
         assert "is not valid under any of the given schemas" in resp.body
-        assert SchemingSchema.get("dataset", "test-type") is None
+        assert SchemingSchemaVersion.head("dataset", "test-type") is None
 
     def test_known_form_snippet_is_accepted(self, app, schema_definition):
         definition = {
@@ -201,7 +201,7 @@ class TestSchemaCreate:
         )
 
         assert resp.status_code == STATUS_OK
-        assert SchemingSchema.get("dataset", "test-type") is not None
+        assert SchemingSchemaVersion.head("dataset", "test-type") is not None
 
     def test_duplicate_schema_is_reported(
         self, app, dataset_schema: dict[str, Any], schema_definition
@@ -251,7 +251,7 @@ class TestSchemaEdit:
         )
 
         assert resp.status_code == STATUS_OK
-        schema = SchemingSchema.get("dataset", "test-type")
+        schema = SchemingSchemaVersion.head("dataset", "test-type")
         assert schema
         assert schema.definition["dataset_fields"][0]["field_name"] == "renamed_field"
 
@@ -268,7 +268,7 @@ class TestSchemaEdit:
 
         assert resp.status_code == STATUS_OK
         assert "is a required property" in resp.body
-        schema = SchemingSchema.get("dataset", "test-type")
+        schema = SchemingSchemaVersion.head("dataset", "test-type")
         assert schema
         assert schema.definition == schema_definition
 
@@ -281,7 +281,7 @@ class TestSchemaDelete:
         )
 
         assert resp.status_code == STATUS_OK
-        assert SchemingSchema.get("dataset", "test-type") is None
+        assert SchemingSchemaVersion.head("dataset", "test-type") is None
 
     def test_unknown_schema_is_not_found(self, app):
         schema_type = "no-such-type"
@@ -291,7 +291,7 @@ class TestSchemaDelete:
         )
 
         assert f"Scheming schema dataset:{schema_type} not found" in resp.body
-        assert SchemingSchema.get("dataset", schema_type) is None
+        assert SchemingSchemaVersion.head("dataset", schema_type) is None
 
     def test_schema_in_use_is_not_deleted(self, app, dataset_schema: dict[str, Any]):
         factories.Dataset(type="test-type")
@@ -302,7 +302,47 @@ class TestSchemaDelete:
         )
 
         assert "datasets of this type still exist" in resp.body
-        assert SchemingSchema.get("dataset", "test-type") is not None
+        assert SchemingSchemaVersion.head("dataset", "test-type") is not None
+
+
+class TestSchemaHistory:
+    def test_anonymous_is_forbidden(self, app, dataset_schema: dict[str, Any]):
+        app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            status=STATUS_FORBIDDEN,
+        )
+
+    def test_regular_user_is_forbidden(self, app, dataset_schema: dict[str, Any]):
+        app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers={"Authorization": factories.UserWithToken()["token"]},
+            status=STATUS_FORBIDDEN,
+        )
+
+    def test_shows_create_entry(self, app, schema_definition):
+        with app.flask_app.test_request_context():
+            helpers.call_action(
+                "scheming_schema_create",
+                context={"user": factories.Sysadmin()["name"]},
+                definition=schema_definition,
+            )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.status_code == STATUS_OK
+        assert "create" in resp.body
+
+    def test_unknown_schema_shows_empty_state(self, app):
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="no-such-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.status_code == STATUS_OK
+        assert "No history recorded" in resp.body
 
 
 class TestSchemaPreview:
@@ -526,7 +566,7 @@ class TestPresetDelete:
             **schema_definition,
             "dataset_fields": [{"field_name": "x", "preset": "test-preset"}],
         }
-        SchemingSchema.create("dataset", "test-type", definition)
+        SchemingSchemaVersion.create("dataset", "test-type", definition)
 
         resp = app.post(
             tk.h.url_for(

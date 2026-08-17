@@ -13,7 +13,7 @@ from ckanext.scheming_dynamic.logic.validators import (
     scheming_schema_exists,
     scheming_schema_not_in_use,
 )
-from ckanext.scheming_dynamic.model import SchemingSchema
+from ckanext.scheming_dynamic.model import SchemingSchemaVersion
 from ckanext.scheming_dynamic.tests import factories as scheming_factories
 
 
@@ -28,7 +28,7 @@ class TestSchemingSchemaExists:
         return scheming_schema_exists(("schema_type",), data, {}, {})
 
     def test_existing_schema_passes(self, schema_definition):
-        SchemingSchema.create("dataset", "test-type", schema_definition)
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
 
         assert self.call_validator("dataset", "test-type") is None
 
@@ -37,7 +37,7 @@ class TestSchemingSchemaExists:
             self.call_validator("dataset", "test-type")
 
     def test_schema_for_other_entity_type_does_not_count(self, schema_definition):
-        SchemingSchema.create("group", "test-type", schema_definition)
+        SchemingSchemaVersion.create("group", "test-type", schema_definition)
 
         with pytest.raises(tk.Invalid, match="not found"):
             self.call_validator("dataset", "test-type")
@@ -183,7 +183,7 @@ class TestSchemingPresetNotInUse:
             **schema_definition,
             "dataset_fields": [{"field_name": "x", "preset": "test-preset"}],
         }
-        SchemingSchema.create("dataset", "test-type", definition)
+        SchemingSchemaVersion.create("dataset", "test-type", definition)
 
         with pytest.raises(tk.Invalid, match="test-type"):
             self._call_not_in_use_validator("test-preset")

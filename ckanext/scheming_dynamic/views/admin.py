@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import difflib
 import json
 from typing import Any
 
 from flask import Blueprint
 from flask.views import MethodView
+from markupsafe import Markup
 
 import ckan.plugins.toolkit as tk
+from ckan.views.admin import before_request
 
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchema
+from ckanext.scheming_dynamic.model import (
+    SchemingPreset,
+    SchemingSchemaActivity,
+    SchemingSchemaVersion,
+)
 from ckanext.scheming_dynamic.preset_resolve import (
     PresetBaseNotFoundError,
     PresetCycleError,
@@ -24,17 +31,6 @@ ADMIN_BP = "scheming_dynamic_admin"
 bp = Blueprint(ADMIN_BP, __name__, url_prefix="/ckan-admin/scheming")
 
 
-def _sysadmin_or_403() -> None:
-    try:
-        tk.check_access("sysadmin", _action_context())
-    except tk.NotAuthorized:
-        tk.abort(403, tk._("Need to be system administrator to administer"))
-
-
-def _action_context() -> Any:
-    return {"user": tk.current_user.name, "auth_user_obj": tk.current_user}
-
-
 def _meta_schema() -> dict[str, Any]:
     return SCHEMA_CLASSES[DEFAULT_ENTITY_TYPE]().build()
 
@@ -47,7 +43,7 @@ def index() -> str:
     return tk.render(
         "scheming_dynamic/index.html",
         {
-            "schemas": SchemingSchema.get_schemas_of_type(DEFAULT_ENTITY_TYPE),
+            "schemas": SchemingSchemaVersion.get_heads_of_type(DEFAULT_ENTITY_TYPE),
             "active_tab": "schemas",
         },
     )
@@ -77,7 +73,7 @@ class CreateView(MethodView):
         }
 
         try:
-            row = tk.get_action("scheming_schema_create")(_action_context(), dict(data))
+            row = tk.get_action("scheming_schema_create")({}, dict(data))
         except tk.ValidationError as e:
             return self.get(data, e.error_dict, e.error_summary)
 
@@ -93,14 +89,16 @@ class EditView(MethodView):
         errors: dict[str, Any] | None = None,
         error_summary: dict[str, Any] | None = None,
     ) -> str:
-        schema = SchemingSchema.get(DEFAULT_ENTITY_TYPE, schema_type)
+        schema = SchemingSchemaVersion.head(DEFAULT_ENTITY_TYPE, schema_type)
         if not schema:
             return tk.abort(404, tk._("Schema not found"))
 
         if data is None:
             data = {
                 "schema_type": schema_type,
-                "definition": json.dumps(schema.definition, indent=2),
+                "definition": json.dumps(
+                    schema.definition, indent=2, ensure_ascii=False
+                ),
             }
 
         return tk.render(
@@ -122,7 +120,7 @@ class EditView(MethodView):
         }
 
         try:
-            tk.get_action("scheming_schema_update")(_action_context(), dict(data))
+            tk.get_action("scheming_schema_update")({}, dict(data))
         except tk.ObjectNotFound:
             return tk.abort(404, tk._("Schema not found"))
         except tk.ValidationError as e:
@@ -130,6 +128,98 @@ class EditView(MethodView):
 
         tk.h.flash_success(tk._("Schema '{}' updated.").format(schema_type))
         return tk.redirect_to(f"{ADMIN_BP}.index")
+
+
+def history(schema_type: str) -> str:
+    rows = tk.get_action("scheming_schema_activity_list")(
+        {},
+        {"schema_type": schema_type, "entity_type": DEFAULT_ENTITY_TYPE},
+    )
+
+    entries = []
+    previous_text = None
+    for row in rows:
+        text = json.dumps(
+            row["definition"], indent=2, sort_keys=True, ensure_ascii=False
+        )
+        has_previous = previous_text is not None
+        diff = (
+            "\n".join(
+                difflib.unified_diff(
+                    previous_text.splitlines(),  # type: ignore
+                    text.splitlines(),
+                    lineterm="",
+                )
+            )
+            if has_previous
+            else None
+        )
+        entries.append(
+            {
+                **row,
+                "has_previous": has_previous,
+                "diff": _highlight_diff(diff) if diff else diff,
+                "definition_text": text,
+            }
+        )
+        previous_text = text
+
+    entries.reverse()
+
+    return tk.render(
+        "scheming_dynamic/schema_history.html",
+        {
+            "schema_type": schema_type,
+            "entries": entries,
+            "active_tab": "history",
+        },
+    )
+
+
+def _highlight_diff(diff_text: str) -> Markup:
+    """Wrap unified-diff lines in classed spans for light CSS highlighting."""
+    css_class = "diff-hunk"
+    lines = []
+
+    for line in diff_text.splitlines():
+        if line.startswith(("+++", "---")):
+            css_class = "diff-meta"
+        elif line.startswith("@@"):
+            css_class = "diff-hunk"
+        elif line.startswith("+"):
+            css_class = "diff-add"
+        elif line.startswith("-"):
+            css_class = "diff-del"
+        else:
+            css_class = "diff-ctx"
+        lines.append(Markup('<span class="{}">{}</span>').format(css_class, line))
+
+    return Markup("\n").join(lines)
+
+
+def history_index() -> str:
+    """List every schema_type with recorded activity, live or deleted."""
+    live = {
+        row.schema_type
+        for row in SchemingSchemaVersion.get_heads_of_type(DEFAULT_ENTITY_TYPE)
+    }
+
+    return tk.render(
+        "scheming_dynamic/history_index.html",
+        {
+            "rows": [
+                {
+                    "schema_type": schema_type,
+                    "entity_type": DEFAULT_ENTITY_TYPE,
+                    "is_live": schema_type in live,
+                }
+                for schema_type in SchemingSchemaActivity.get_schema_types(
+                    DEFAULT_ENTITY_TYPE
+                )
+            ],
+            "active_tab": "history",
+        },
+    )
 
 
 def preview() -> Any:
@@ -172,9 +262,7 @@ def _preview_errors(messages: list[str]) -> Any:
 
 def delete(schema_type: str) -> Any:
     try:
-        tk.get_action("scheming_schema_delete")(
-            _action_context(), {"schema_type": schema_type}
-        )
+        tk.get_action("scheming_schema_delete")({}, {"schema_type": schema_type})
     except tk.ValidationError as e:
         tk.h.flash_error("; ".join(e.error_summary.values()))
     else:
@@ -214,7 +302,7 @@ class PresetCreateView(MethodView):
         }
 
         try:
-            row = tk.get_action("scheming_preset_create")(_action_context(), dict(data))
+            row = tk.get_action("scheming_preset_create")({}, dict(data))
         except tk.ValidationError as e:
             return self.get(data, e.error_dict, e.error_summary)
 
@@ -240,6 +328,7 @@ class PresetEditView(MethodView):
                 "definition": json.dumps(
                     {"preset_name": preset.preset_name, "values": preset.values},
                     indent=2,
+                    ensure_ascii=False,
                 ),
             }
 
@@ -262,7 +351,7 @@ class PresetEditView(MethodView):
         }
 
         try:
-            tk.get_action("scheming_preset_update")(_action_context(), dict(data))
+            tk.get_action("scheming_preset_update")({}, dict(data))
         except tk.ObjectNotFound:
             return tk.abort(404, tk._("Preset not found"))
         except tk.ValidationError as e:
@@ -330,9 +419,7 @@ def _preset_preview_errors(messages: list[str]) -> Any:
 
 def preset_delete(preset_name: str) -> Any:
     try:
-        tk.get_action("scheming_preset_delete")(
-            _action_context(), {"preset_name": preset_name}
-        )
+        tk.get_action("scheming_preset_delete")({}, {"preset_name": preset_name})
     except tk.ValidationError as e:
         tk.h.flash_error("; ".join(e.error_summary.values()))
     else:
@@ -341,10 +428,12 @@ def preset_delete(preset_name: str) -> Any:
     return tk.redirect_to(f"{ADMIN_BP}.presets_index")
 
 
-bp.before_request(_sysadmin_or_403)
+bp.before_request(before_request)
 bp.add_url_rule("/", view_func=index)
 bp.add_url_rule("/new", view_func=CreateView.as_view("new"))
 bp.add_url_rule("/<schema_type>/edit", view_func=EditView.as_view("edit"))
+bp.add_url_rule("/history", view_func=history_index)
+bp.add_url_rule("/<schema_type>/history", view_func=history)
 bp.add_url_rule("/<schema_type>/delete", view_func=delete, methods=["POST"])
 bp.add_url_rule("/preview", view_func=preview, methods=["POST"])
 bp.add_url_rule("/presets/", view_func=presets_index)

@@ -9,10 +9,11 @@ from sqlalchemy.exc import DBAPIError, UnboundExecutionError
 import ckan.plugins.toolkit as tk
 from ckan import model
 
-from ckanext.scheming.plugins import _SchemingMixin
+from ckanext.scheming.plugins import _expand_schemas, _SchemingMixin
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
-    SchemingSchema,
+    SchemingSchemaPin,
+    SchemingSchemaVersion,
     SchemingState,
 )
 from ckanext.scheming_dynamic.preset_resolve import (
@@ -22,6 +23,8 @@ from ckanext.scheming_dynamic.preset_resolve import (
 )
 
 log = logging.getLogger(__name__)
+
+_expanded_version_cache: dict[tuple[str, str, int], dict[str, Any]] = {}
 
 
 def dataset_schemas_if_changed(
@@ -60,7 +63,7 @@ def dataset_schemas_if_changed(
 
     merged = dict(static_schemas)
 
-    for row in SchemingSchema.get_schemas_of_type(entity_type="dataset"):
+    for row in SchemingSchemaVersion.get_heads_of_type(entity_type="dataset"):
         merged[row.schema_type] = row.definition
 
     state["pending_fingerprint"] = fingerprint
@@ -133,6 +136,41 @@ def ensure_presets_synced() -> None:
     state["fingerprint"] = fingerprint
 
 
+def pinned_expanded_schema(
+    entity_type: str, schema_type: str, entity_id: str | None
+) -> dict[str, Any] | None:
+    """Return the expanded schema an entity was pinned to, if it differs from HEAD.
+
+    Returns None when there's no pin (predates this feature, or the schema
+    was never locked) or the pin already points at the current HEAD, so the
+    caller can fall back to its normal (live) expanded schema.
+
+    Results are cached by (entity_type, schema_type, version) for the life
+    of the process: locked versions are immutable, so there's nothing to
+    invalidate.
+    """
+    if not entity_id:
+        return None
+
+    pin = SchemingSchemaPin.get(entity_type, entity_id)
+    if pin is None:
+        return None
+
+    if pin.version == SchemingSchemaVersion.head_version(entity_type, schema_type):
+        return None
+
+    cache_key = (entity_type, schema_type, pin.version)
+    if cache_key not in _expanded_version_cache:
+        version_row = SchemingSchemaVersion.get(entity_type, schema_type, pin.version)
+        if version_row is None:
+            return None
+        _expanded_version_cache[cache_key] = _expand_schemas(
+            {schema_type: version_row.definition}
+        )[schema_type]
+
+    return _expanded_version_cache[cache_key]
+
+
 def reset() -> None:
     """Forget cached fingerprints/snapshots, for test isolation."""
     _SchemingMixin.dynamic_scheming["schema"] = {
@@ -141,6 +179,7 @@ def reset() -> None:
     }
     _SchemingMixin.dynamic_scheming["preset"] = {"fingerprint": None, "static": None}
     _SchemingMixin._presets = None
+    _expanded_version_cache.clear()
 
 
 def _checked_in_this_request(flag: str) -> bool:

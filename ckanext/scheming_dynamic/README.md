@@ -5,9 +5,14 @@ a server restart.
 
 ## How it works
 
-- Schemas live in the `scheming_schema` table (`entity_type` + `schema_type`
-  primary key, JSONB `definition`). `schema_type` is a unique entity type (e.g. `dataset_type`)
-  and must match the `dataset_type` field inside the definition.
+- Schemas live in the `scheming_schema_version` table (`entity_type` +
+  `schema_type` + `version` primary key, JSONB `definition`). `schema_type`
+  is a unique entity type (e.g. `dataset_type`) and must match the
+  `dataset_type` field inside the definition. A schema's live definition is
+  its head (highest) version row: `scheming_schema_create` locks version 1
+  immediately, and edits either overwrite that head row in place (nothing
+  has pinned it yet) or fork the next version (an entity is already pinned
+  to it) — see `scheming_schema_pin`.
 - Before ckanext-scheming returns any dataset schema it asks this extension
   whether anything changed since the last merge — a cheap lookup of a single
   row in `scheming_state` (one row per counter key, a version counter
@@ -51,6 +56,23 @@ Apply the migration:
 ckan db upgrade -p scheming_dynamic
 ```
 
+### Enabling on a portal with existing data
+
+If the portal already has datasets under a file-defined (`scheming.dataset_schemas`)
+type, importing that schema into the database and pinning existing datasets to it
+keeps them validating/rendering against the exact schema they were created with,
+even after later edits. Run once per existing dataset type:
+
+```sh
+ckan scheming-dynamic sync --type dataset SCHEMA_TYPE
+ckan scheming-dynamic pin --type dataset SCHEMA_TYPE
+```
+
+`sync` imports the static definition into the database and locks it as version 1.
+`pin` then locks every not-yet-pinned dataset of that type to a specific version
+
+See [CLI](#cli) below for the full flag reference.
+
 ## API
 
 All actions are sysadmin-only.
@@ -67,6 +89,13 @@ Definitions are validated against a JSON Schema mirroring the minimal shape.
 `form_snippet`, `display_snippet`, `choices`, `field_name`, `preset`, ...);
 setting `values.preset` bases the new preset on another registered one.
 
+
+## CLI
+
+- `ckan scheming-dynamic validation-schema --type dataset|group|organization` — print the JSON Schema that validates a ckanext-scheming schema definition
+- `ckan scheming-dynamic validate --type dataset schema.yaml [more.json ...]` — validate schema definition file(s) against that JSON Schema
+- `ckan scheming-dynamic sync --type dataset SCHEMA_TYPE` — bootstrap a dynamic schema from its static (file-defined) definition: creates it and locks version 1 if none exists yet, or locks a new version if the static definition changed since the last locked version (reports and does nothing if unchanged). Run this once when turning on scheming_dynamic on a portal that already has entities of `SCHEMA_TYPE`; existing entities are left unpinned.
+- `ckan scheming-dynamic pin --type dataset SCHEMA_TYPE [-v VERSION] [--no-validate]` — pin every not-yet-pinned entity of `SCHEMA_TYPE` to a locked schema version (default: current HEAD). Each entity's data is validated against that version first; entities that fail are reported and left unpinned rather than failing the whole command. `--no-validate` pins everything unconditionally, skipping that check.
 
 ## Admin UI
 
@@ -91,3 +120,9 @@ definition with the same form snippets the real dataset/resource forms use.
   can be stored but are not yet picked up by ckanext-scheming.
 - Changing a schema does not reindex existing datasets; run
   `ckan search-index rebuild` after incompatible changes.
+- Version locking only covers the schema `definition` itself, not the
+  presets it references. `SchemingPreset` rows are live/unversioned and
+  shared globally, so editing a preset changes what every schema version
+  using it resolves to, including versions already locked/pinned. A real
+  fix needs preset versioning (or expanding+freezing preset values into the
+  schema snapshot at lock time, at the cost of the raw/editable definition).

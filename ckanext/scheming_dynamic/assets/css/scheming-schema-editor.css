@@ -109,3 +109,26 @@
 #scheming-preset-form .jedi-btn:disabled {
   border: unset;
 }
+
+.scheming-history-diff .diff-add {
+  color: black;
+  background: #ddf4ff;
+}
+
+.scheming-history-diff .diff-del {
+  color: black;
+  background: #fff1e5;
+}
+
+.scheming-history-diff .diff-hunk {
+  color: #6f42c1;
+}
+
+.scheming-history-diff .diff-meta {
+  color: #57606a;
+  font-weight: bold;
+}
+
+.scheming-history-diff .diff-ctx {
+  color: inherit;
+}

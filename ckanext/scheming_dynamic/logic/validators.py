@@ -8,7 +8,7 @@ from ckan.lib.navl.dictization_functions import missing
 from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic import sync
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchema
+from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
 from ckanext.scheming_dynamic.preset_resolve import (
     PresetBaseNotFoundError,
     PresetCycleError,
@@ -68,7 +68,7 @@ def scheming_schema_exists(
     entity_type = data[("entity_type",)]
     schema_type = data[("schema_type",)]
 
-    if SchemingSchema.get(entity_type, schema_type):
+    if SchemingSchemaVersion.head_version(entity_type, schema_type):
         return
 
     raise tk.Invalid(tk._(f"Scheming schema {entity_type}:{schema_type} not found."))
@@ -184,7 +184,7 @@ def scheming_preset_not_in_use(
         )
 
     for entity_type in SCHEMA_CLASSES:
-        for row in SchemingSchema.get_schemas_of_type(entity_type):
+        for row in SchemingSchemaVersion.get_heads_of_type(entity_type):
             if not _definition_uses_any_preset(row.definition, dependents):
                 continue
 

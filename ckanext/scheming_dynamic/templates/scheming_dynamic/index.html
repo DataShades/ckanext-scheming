@@ -20,10 +20,17 @@
           <tr>
             <td>{{ schema.schema_type }}</td>
             <td>{{ schema.entity_type }}</td>
-            <td>{{ h.render_datetime(schema.updated, with_hours=True) }}</td>
+            <td>{{ h.render_datetime(schema.created, with_hours=True) }}</td>
             <td>
               <form method="post" action="{% url_for 'scheming_dynamic_admin.delete', schema_type=schema.schema_type %}">
                 <div class="btn-group float-end">
+                  <a class="btn btn-secondary btn-sm"
+                      href="{% url_for 'scheming_dynamic_admin.history', schema_type=schema.schema_type %}"
+                      aria-label="{{ _('View schema history') }}"
+                      data-bs-title="{{ _('View schema history') }}"
+                      data-bs-toggle="tooltip">
+                    <i class="fa fa-history"></i>
+                  </a>
                   <a class="btn btn-secondary btn-sm"
                       href="{% url_for 'scheming_dynamic_admin.edit', schema_type=schema.schema_type %}"
                       aria-label="{{ _('Edit schema') }}"

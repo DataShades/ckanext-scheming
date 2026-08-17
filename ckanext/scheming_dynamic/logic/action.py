@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from typing import Any
+from contextlib import nullcontext
+from typing import Any, cast
+
+from click import get_current_context
+from flask import has_app_context
 
 import ckan.plugins.toolkit as tk
+from ckan import model
 from ckan.logic import validate
 
 from ckanext.scheming_dynamic.logic import schema
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchema
+from ckanext.scheming_dynamic.model import (
+    SchemingPreset,
+    SchemingSchemaActivity,
+    SchemingSchemaPin,
+    SchemingSchemaVersion,
+    SchemingState,
+)
 from ckanext.scheming_dynamic.preset_resolve import (
     PresetBaseNotFoundError,
     PresetCycleError,
@@ -37,14 +48,25 @@ def scheming_schema_create(context: Any, data_dict: dict[str, Any]) -> dict[str,
 
     schema_type = definition[TYPE_FIELDS[entity_type]]
 
-    if SchemingSchema.get(entity_type, schema_type):
+    if SchemingSchemaVersion.head_version(entity_type, schema_type):
         raise tk.ValidationError(
             {"schema_type": [tk._(f"Schema for '{schema_type}' already exists")]}
         )
 
     _check_schema_renders(schema_type, definition)
 
-    row = SchemingSchema.create(entity_type, schema_type, definition)
+    # locked first: the activity row's FK needs version 1 to already exist
+    row = SchemingSchemaVersion.lock(entity_type, schema_type, definition)
+    SchemingSchemaActivity.record(
+        entity_type,
+        schema_type,
+        SchemingSchemaActivity.CREATE,
+        context["user"],
+        definition,
+        version=row.version,
+    )
+    SchemingState.bump(entity_type)
+    model.Session.commit()
 
     return row.as_dict()
 
@@ -66,8 +88,7 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
     schema_type = data_dict["schema_type"]
     definition = data_dict["definition"]
 
-    schema = SchemingSchema.get(entity_type, schema_type)
-    if not schema:
+    if not SchemingSchemaVersion.head_version(entity_type, schema_type):
         raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
     type_field = TYPE_FIELDS[entity_type]
@@ -82,9 +103,42 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
 
     _check_schema_renders(schema_type, definition)
 
-    schema.update_definition(definition)
+    row = _lock_or_sync_version(entity_type, schema_type, definition)
 
-    return schema.as_dict()
+    SchemingSchemaActivity.record(
+        entity_type,
+        schema_type,
+        SchemingSchemaActivity.UPDATE,
+        context["user"],
+        definition,
+        version=row.version,
+    )
+    SchemingState.bump(entity_type)
+    model.Session.commit()
+
+    return row.as_dict()
+
+
+def _lock_or_sync_version(
+    entity_type: str, schema_type: str, definition: dict[str, Any]
+) -> SchemingSchemaVersion:
+    """Apply an edit to the schema's current (head) version.
+
+    If the head version is already pinned by an entity, it can't be changed
+    -- so this locks ``definition`` as a new version instead. Otherwise
+    nothing depends on the head version yet, so it's safe to overwrite its
+    definition directly.
+
+    Returns the version row that now holds ``definition``.
+    """
+    head_version = SchemingSchemaVersion.head_version(entity_type, schema_type)
+
+    if SchemingSchemaPin.is_version_locked(entity_type, schema_type, head_version):
+        return SchemingSchemaVersion.lock(entity_type, schema_type, definition)
+
+    existing = cast(SchemingSchemaVersion, SchemingSchemaVersion.get(entity_type, schema_type, head_version))
+    existing.definition = definition
+    return existing
 
 
 @validate(schema.scheming_schema_delete)
@@ -101,13 +155,44 @@ def scheming_schema_delete(context: Any, data_dict: dict[str, Any]) -> bool:
     entity_type = data_dict["entity_type"]
     schema_type = data_dict["schema_type"]
 
-    schema = SchemingSchema.get(entity_type, schema_type)
-    if not schema:
+    head = SchemingSchemaVersion.head(entity_type, schema_type)
+    if not head:
         raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
-    schema.delete()
+    SchemingSchemaActivity.record(
+        entity_type,
+        schema_type,
+        SchemingSchemaActivity.DELETE,
+        context["user"],
+        head.definition,
+    )
+    SchemingSchemaVersion.delete_all(entity_type, schema_type)
+    SchemingState.bump(entity_type)
+    model.Session.commit()
 
     return True
+
+
+@validate(schema.scheming_schema_activity_list)
+def scheming_schema_activity_list(
+    context: Any, data_dict: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """List a dynamic schema's activity history, oldest first.
+
+    :param schema_type: the schema type whose history should be listed
+    :type schema_type: string
+    :param entity_type: the entity this schema applies to (default: ``dataset``)
+    :type entity_type: string
+    """
+    tk.check_access("scheming_schema_activity_list", context, data_dict)
+
+    entity_type = data_dict["entity_type"]
+    schema_type = data_dict["schema_type"]
+
+    return [
+        row.as_dict()
+        for row in SchemingSchemaActivity.get_history(entity_type, schema_type)
+    ]
 
 
 def _check_schema_renders(schema_type: str, definition: dict[str, Any]) -> None:
@@ -116,12 +201,24 @@ def _check_schema_renders(schema_type: str, definition: dict[str, Any]) -> None:
     Mirrors the /preview check, so a schema broken the same way can't be
     saved through the create/update actions either.
     """
-    try:
-        render_schema_form(schema_type, definition)
-    except Exception as e:  # noqa: BLE001
-        raise tk.ValidationError(
-            {"definition": [tk._("Schema cannot be rendered: {}").format(e)]}
-        ) from e
+    # TODO: this is a bit of a hack, but it's the only way to get the
+    # render-check of a schema's form work for both CLI (e.g. ckanapi)
+    # and web UI.
+    if has_app_context():
+        ctx = nullcontext()
+    else:
+        try:
+            ctx = get_current_context().meta["flask_app"].test_request_context("/")
+        except RuntimeError:
+            return
+
+    with ctx:
+        try:
+            render_schema_form(schema_type, definition)
+        except Exception as e:  # noqa: BLE001
+            raise tk.ValidationError(
+                {"definition": [tk._("Schema cannot be rendered: {}").format(e)]}
+            ) from e
 
 
 def _check_preset_renders(preset_name: str, values: dict[str, Any]) -> None:

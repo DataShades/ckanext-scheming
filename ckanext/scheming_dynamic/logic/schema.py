@@ -69,6 +69,23 @@ def scheming_schema_delete(  # noqa: PLR0913
 
 
 @validator_args
+def scheming_schema_activity_list(
+    not_missing: types.Validator,
+    unicode_safe: types.Validator,
+    one_of: types.ValidatorFactory,
+    default: types.ValidatorFactory,
+) -> types.Schema:
+    return {
+        "schema_type": [not_missing, unicode_safe],
+        "entity_type": [
+            default(DEFAULT_ENTITY_TYPE),
+            unicode_safe,
+            one_of(ENTITY_TYPES),
+        ],
+    }
+
+
+@validator_args
 def scheming_preset_create(
     not_missing: types.Validator,
     convert_to_json_if_string: types.Validator,

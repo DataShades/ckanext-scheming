@@ -1,5 +1,7 @@
 {% extends 'package/new_package_form.html' %}
 
+{%- set schema = h.dynamic_scheming_get_entity_schema(dataset_type, 'dataset', data.id) if h.plugin_loaded('scheming_dynamic') else h.scheming_get_dataset_schema(dataset_type) -%}
+
 {% block stages %}
   {%- set pages = h.scheming_get_dataset_form_pages(dataset_type) -%}
   {%- if pages -%}
@@ -59,7 +61,6 @@
 
 {% block errors %}
   {%- if errors -%}
-    {%- set schema = h.scheming_get_dataset_schema(dataset_type) -%}
     {%- snippet 'scheming/snippets/errors.html',
       errors=errors, fields=schema.dataset_fields,
       entity_type='dataset', object_type=dataset_type -%}
@@ -74,7 +75,6 @@
     </p>
   {%- endif -%}
 
-  {%- set schema = h.scheming_get_dataset_schema(dataset_type) -%}
   {%- set pages = h.scheming_get_dataset_form_pages(dataset_type) -%}
   {%- if pages -%}
     {%- set active_page = data.get('_form_page', 1) | int -%}
