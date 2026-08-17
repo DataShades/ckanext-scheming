@@ -169,11 +169,20 @@ ckan.module('scheming-schema-editor', function ($) {
         if (typeof window.jsyaml === 'undefined') {
           throw jsonErr;
         }
+
+        var parsed;
+
         try {
-          return window.jsyaml.load(raw);
+          parsed = window.jsyaml.load(raw);
         } catch (yamlErr) {
           throw jsonErr;
         }
+
+        if (parsed === undefined || parsed === null) {
+          throw jsonErr;
+        }
+
+        return parsed;
       }
     },
 
