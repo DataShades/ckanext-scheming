@@ -95,7 +95,7 @@ setting `values.preset` bases the new preset on another registered one.
 - `ckan scheming-dynamic validation-schema --type dataset|group|organization` — print the JSON Schema that validates a ckanext-scheming schema definition
 - `ckan scheming-dynamic validate --type dataset schema.yaml [more.json ...]` — validate schema definition file(s) against that JSON Schema
 - `ckan scheming-dynamic sync --type dataset SCHEMA_TYPE` — bootstrap a dynamic schema from its static (file-defined) definition: creates it and locks version 1 if none exists yet, or locks a new version if the static definition changed since the last locked version (reports and does nothing if unchanged). Run this once when turning on scheming_dynamic on a portal that already has entities of `SCHEMA_TYPE`; existing entities are left unpinned.
-- `ckan scheming-dynamic pin --type dataset SCHEMA_TYPE [-v VERSION] [--no-validate]` — pin every not-yet-pinned entity of `SCHEMA_TYPE` to a locked schema version (default: current HEAD). Each entity's data is validated against that version first; entities that fail are reported and left unpinned rather than failing the whole command. `--no-validate` pins everything unconditionally, skipping that check.
+- `ckan scheming-dynamic pin --type dataset SCHEMA_TYPE [-v VERSION] [--no-validate] [--dry-run]` — pin every not-yet-pinned entity of `SCHEMA_TYPE` to a locked schema version (default: current HEAD). Each entity's data is validated against that version first; entities that fail are reported and left unpinned rather than failing the whole command. `--no-validate` pins everything unconditionally, skipping that check. `--dry-run` reports what would be pinned/would fail without writing any pins.
 
 ## Admin UI
 

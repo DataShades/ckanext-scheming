@@ -177,13 +177,20 @@ def sync(ctx: click.Context, entity_type: str, schema_type: str):
         "data would validate against the target version. Risky."
     ),
 )
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Report what would be pinned/fail without actually pinning anything.",
+)
 @click.pass_context
-def pin(
+def pin(  # noqa: PLR0913
     ctx: click.Context,
     entity_type: str,
     schema_type: str,
     version: int | None,
     no_validate: bool,
+    dry_run: bool,
 ):
     """Pin every not-yet-pinned entity of SCHEMA_TYPE to a locked schema version.
 
@@ -191,6 +198,9 @@ def pin(
     version first; entities that fail are reported and left unpinned so they
     can be reviewed later. A failure does not stop the command from continuing
     to the next entity. Pass --no-validate to pin unconditionally.
+
+    Pass --dry-run to see what the command would do -- including running
+    validation, unless combined with --no-validate -- without writing any pins.
 
     ckan scheming-dynamic pin --type dataset test-type -v 1
     """
@@ -206,13 +216,16 @@ def pin(
             failed += 1
             continue
 
-        SchemingSchemaPin.pin(entity_type, entity.id, schema_type, target_version)
-        model.Session.commit()
+        if not dry_run:
+            SchemingSchemaPin.pin(entity_type, entity.id, schema_type, target_version)
+            model.Session.commit()
         pinned += 1
 
-    summary = f"Pinned {pinned} {entity_type}(s) to version {target_version}"
+    verb = "Would pin" if dry_run else "Pinned"
+    summary = f"{verb} {pinned} {entity_type}(s) to version {target_version}"
     if failed:
-        summary += f", {failed} failed validation and were left unpinned"
+        would = "would fail" if dry_run else "failed"
+        summary += f", {failed} {would} validation and were left unpinned"
 
     click.secho(summary, fg="yellow" if failed else "green")
     ctx.exit(1 if failed else 0)

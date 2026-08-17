@@ -107,9 +107,7 @@ class TestValidateCommand:
 @pytest.mark.ckan_config("ckan.plugins", "scheming_datasets scheming_dynamic")
 @pytest.mark.usefixtures("with_plugins", "clean_db", "with_extended_cli")
 class TestSyncCommand:
-    def test_creates_schema_and_locks_version_one(
-        self, cli, static_schema, test_request_context
-    ):
+    def test_creates_schema_and_locks_version_one(self, cli, static_schema):
         result = cli.invoke(
             ckan,
             [
@@ -137,7 +135,7 @@ class TestSyncCommand:
         assert version
         assert version.definition == static_schema
 
-    def test_rerun_with_unchanged_static_does_nothing(self, cli, test_request_context):
+    def test_rerun_with_unchanged_static_does_nothing(self, cli):
         first = cli.invoke(
             ckan,
             [
@@ -169,7 +167,7 @@ class TestSyncCommand:
         )
 
     def test_rerun_with_changed_static_locks_new_version(
-        self, cli, static_schema, tmp_path, ckan_config, test_request_context
+        self, cli, static_schema, tmp_path, ckan_config
     ):
         schema_path = tmp_path / "dataset.json"
         schema_path.write_text(json.dumps(static_schema))
@@ -222,9 +220,7 @@ class TestSyncCommand:
         assert head
         assert head.definition == updated
 
-    def test_existing_unpinned_schema_is_overwritten_in_place(
-        self, cli, static_schema, test_request_context
-    ):
+    def test_existing_unpinned_schema_is_overwritten_in_place(self, cli, static_schema):
         draft = {**static_schema, "dataset_fields": [{"field_name": "other"}]}
         SchemingSchemaVersion.create("dataset", STATIC_DATASET_SCHEMA_TYPE, draft)
 
@@ -249,7 +245,7 @@ class TestSyncCommand:
         assert version
         assert version.definition == static_schema
 
-    def test_missing_static_schema_reports_error(self, cli, test_request_context):
+    def test_missing_static_schema_reports_error(self, cli):
         result = cli.invoke(
             ckan,
             ["scheming-dynamic", "sync", "--type", "dataset", "does-not-exist"],
@@ -258,9 +254,7 @@ class TestSyncCommand:
         assert result.exit_code == 1
         assert "No static dataset schema found" in result.output
 
-    def test_entity_type_without_plugin_loaded_reports_error(
-        self, cli, test_request_context
-    ):
+    def test_entity_type_without_plugin_loaded_reports_error(self, cli):
         result = cli.invoke(
             ckan,
             ["scheming-dynamic", "sync", "--type", "group", "test-group"],
@@ -273,7 +267,7 @@ class TestSyncCommand:
 @pytest.mark.ckan_config("ckan.plugins", "scheming_datasets scheming_dynamic")
 @pytest.mark.usefixtures("with_plugins", "clean_db", "with_extended_cli")
 class TestPinCommand:
-    def test_no_locked_version_reports_error(self, cli, test_request_context):
+    def test_no_locked_version_reports_error(self, cli):
         # STATIC_DATASET_SCHEMA_TYPE was never synced/created, so it has no
         # scheming_schema_version rows at all yet
         result = cli.invoke(
@@ -290,7 +284,7 @@ class TestPinCommand:
         assert result.exit_code == 1
         assert "No locked version" in result.output
 
-    def test_version_does_not_exist_reports_error(self, cli, test_request_context):
+    def test_version_does_not_exist_reports_error(self, cli):
         setup = cli.invoke(
             ckan,
             [
@@ -319,7 +313,7 @@ class TestPinCommand:
         assert result.exit_code == 1
         assert "Version 99 does not exist" in result.output
 
-    def test_pins_legacy_unpinned_dataset_to_head(self, cli, test_request_context):
+    def test_pins_legacy_unpinned_dataset_to_head(self, cli):
         # created before the dynamic schema row exists: `create()`'s
         # ensure_pinned hook bails out, leaving it genuinely unpinned --
         # exactly the "existing packages" scenario `sync`/`pin` are for.
@@ -355,7 +349,38 @@ class TestPinCommand:
         assert pin
         assert pin.version == 1
 
-    def test_rerun_pins_nothing_already_pinned(self, cli, test_request_context):
+    def test_dry_run_reports_without_pinning(self, cli):
+        legacy = factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
+
+        setup = cli.invoke(
+            ckan,
+            [
+                "scheming-dynamic",
+                "sync",
+                "--type",
+                "dataset",
+                STATIC_DATASET_SCHEMA_TYPE,
+            ],
+        )
+        assert setup.exit_code == 0, setup.output
+
+        result = cli.invoke(
+            ckan,
+            [
+                "scheming-dynamic",
+                "pin",
+                "--type",
+                "dataset",
+                STATIC_DATASET_SCHEMA_TYPE,
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Would pin 1 dataset(s) to version 1" in result.output
+        assert SchemingSchemaPin.get("dataset", legacy["id"]) is None
+
+    def test_rerun_pins_nothing_already_pinned(self, cli):
         factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
         sync_result = cli.invoke(
             ckan,
@@ -394,7 +419,7 @@ class TestPinCommand:
         assert result.exit_code == 0, result.output
         assert "Pinned 0 dataset(s)" in result.output
 
-    def test_pin_to_explicit_older_version(self, cli, test_request_context):
+    def test_pin_to_explicit_older_version(self, cli):
         legacy = factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
         setup = cli.invoke(
             ckan,
@@ -426,9 +451,7 @@ class TestPinCommand:
         assert pin
         assert pin.version == 1
 
-    def test_validation_failure_is_reported_and_left_unpinned(
-        self, cli, static_schema, test_request_context
-    ):
+    def test_validation_failure_is_reported_and_left_unpinned(self, cli, static_schema):
         legacy = factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
         setup = cli.invoke(
             ckan,
@@ -481,9 +504,54 @@ class TestPinCommand:
         assert "brand_new_required" in result.output
         assert SchemingSchemaPin.get("dataset", legacy["id"]) is None
 
-    def test_no_validate_pins_despite_failure(
-        self, cli, static_schema, test_request_context
-    ):
+    def test_dry_run_still_reports_validation_failures(self, cli, static_schema):
+        legacy = factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
+        setup = cli.invoke(
+            ckan,
+            [
+                "scheming-dynamic",
+                "sync",
+                "--type",
+                "dataset",
+                STATIC_DATASET_SCHEMA_TYPE,
+            ],
+        )
+        assert setup.exit_code == 0, setup.output
+
+        factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
+
+        updated = {
+            **static_schema,
+            "dataset_fields": [
+                *static_schema["dataset_fields"],
+                {"field_name": "brand_new_required", "required": True},
+            ],
+        }
+        site_user = helpers.call_action("get_site_user")
+        helpers.call_action(
+            "scheming_schema_update",
+            context={"user": site_user["name"], "ignore_auth": True},
+            schema_type=STATIC_DATASET_SCHEMA_TYPE,
+            definition=updated,
+        )
+
+        result = cli.invoke(
+            ckan,
+            [
+                "scheming-dynamic",
+                "pin",
+                "--type",
+                "dataset",
+                STATIC_DATASET_SCHEMA_TYPE,
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "1 would fail validation and were left unpinned" in result.output
+        assert SchemingSchemaPin.get("dataset", legacy["id"]) is None
+
+    def test_no_validate_pins_despite_failure(self, cli, static_schema):
         legacy = factories.Dataset(type=STATIC_DATASET_SCHEMA_TYPE)
         setup = cli.invoke(
             ckan,
