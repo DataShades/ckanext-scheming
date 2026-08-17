@@ -4,8 +4,10 @@ import json
 from typing import Any
 
 import pytest
+from freezegun import freeze_time
 
 import ckan.plugins.toolkit as tk
+from ckan import model
 from ckan.tests import factories, helpers
 
 from ckanext.scheming_dynamic.model import (
@@ -592,6 +594,115 @@ class TestSchemaHistory:
 
         assert "Назва" in resp.body
         assert "\\u041d" not in resp.body
+
+    def test_history_paginates_across_pages(self, app):
+        # bypass the create/update actions (and their render checks) --
+        # only the raw activity rows matter for this view
+        for i in range(12):
+            with freeze_time(f"2024-01-01T00:00:{i:02d}Z"):
+                SchemingSchemaActivity.record(
+                    "dataset",
+                    "test-type",
+                    (
+                        SchemingSchemaActivity.CREATE
+                        if i == 0
+                        else SchemingSchemaActivity.UPDATE
+                    ),
+                    "test-actor",
+                    {
+                        "about": "x",
+                        "dataset_type": "test-type",
+                        "dataset_fields": [{"field_name": f"field-{i:02d}"}],
+                        "resource_fields": [],
+                    },
+                )
+        model.Session.commit()
+
+        page1 = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert page1.status_code == STATUS_OK
+        # newest 10 of 12 entries rendered: field-11 (newest) down to field-02
+        assert page1.body.count('class="accordion-item"') == 10
+        assert "field-11" in page1.body
+        assert "field-02" in page1.body
+        # field-01 is only diff *context* fetched to compute field-02's
+        # diff (a removed "-" line in it) -- it must not get its own
+        # accordion entry, and field-00 (one further back) shouldn't be
+        # fetched at all
+        assert page1.body.count("field-01") == 1
+        assert "diff-del" in page1.body
+        assert "field-00" not in page1.body
+        assert "Initial definition:" not in page1.body
+
+        page2 = app.get(
+            tk.url_for(
+                "scheming_dynamic_admin.history", schema_type="test-type", page=2
+            ),
+            headers=_sysadmin_headers(),
+        )
+
+        assert page2.status_code == STATUS_OK
+        # the 2 remaining, oldest entries, both rendered as their own
+        # entries: field-00 (the real first entry) and field-01 (diffed
+        # against it, not fetched again as page1's context row)
+        assert page2.body.count('class="accordion-item"') == 2
+        assert "field-00" in page2.body
+        assert "field-01" in page2.body
+        assert page2.body.count("Initial definition:") == 1
+        assert "Diff from previous version:" in page2.body
+
+
+class TestSchemaHistoryIndex:
+    def test_anonymous_is_forbidden(self, app):
+        app.get(
+            tk.url_for("scheming_dynamic_admin.history_index"),
+            status=STATUS_FORBIDDEN,
+        )
+
+    def test_regular_user_is_forbidden(self, app):
+        app.get(
+            tk.url_for("scheming_dynamic_admin.history_index"),
+            headers={"Authorization": factories.UserWithToken()["token"]},
+            status=STATUS_FORBIDDEN,
+        )
+
+    def test_shows_live_and_deleted_types(self, app, schema_definition):
+        sysadmin = factories.Sysadmin()["name"]
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        deleted = {**schema_definition, "dataset_type": "was-a-type"}
+        helpers.call_action(
+            "scheming_schema_create", context={"user": sysadmin}, definition=deleted
+        )
+        helpers.call_action(
+            "scheming_schema_delete",
+            context={"user": sysadmin},
+            schema_type="was-a-type",
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history_index"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.status_code == STATUS_OK
+        assert "test-type" in resp.body
+        assert "was-a-type" in resp.body
+
+    def test_empty_listing_shows_hint(self, app):
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history_index"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "No schema activity has been recorded yet." in resp.body
+
 
 
 class TestSchemaRestore:

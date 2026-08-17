@@ -9,6 +9,7 @@ from flask.views import MethodView
 from markupsafe import Markup
 
 import ckan.plugins.toolkit as tk
+from ckan.lib.pagination import Page
 from ckan.views.admin import before_request
 
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
@@ -27,6 +28,8 @@ from ckanext.scheming_dynamic.schema import SCHEMA_CLASSES, PresetSchema
 from ckanext.scheming_dynamic.validator import error_location, iter_errors
 
 ADMIN_BP = "scheming_dynamic_admin"
+HISTORY_PAGE_SIZE = 10
+SCHEMA_TYPES_PAGE_SIZE = 20
 
 
 bp = Blueprint(ADMIN_BP, __name__, url_prefix="/ckan-admin/scheming")
@@ -146,16 +149,35 @@ class EditView(MethodView):
 
 
 def history(schema_type: str) -> str:
-    rows = tk.get_action("scheming_schema_activity_list")(
-        {},
-        {"schema_type": schema_type, "entity_type": DEFAULT_ENTITY_TYPE},
+    entity_type = DEFAULT_ENTITY_TYPE
+    page_number = tk.h.get_page_number(tk.request.args)
+
+    total = SchemingSchemaActivity.count_history(entity_type, schema_type)
+    offset = max(total - page_number * HISTORY_PAGE_SIZE, 0)
+    end = max(total - (page_number - 1) * HISTORY_PAGE_SIZE, 0)
+    page_size = max(end - offset, 0)
+
+    rows = (
+        SchemingSchemaActivity.get_history(
+            entity_type, schema_type, limit=page_size, offset=offset
+        )
+        if page_size
+        else []
     )
 
-    entries = []
     previous_text = None
+    if offset > 0 and rows:
+        context_row = rows[0]
+        previous_text = json.dumps(
+            context_row.definition, indent=2, sort_keys=True, ensure_ascii=False
+        )
+        rows = rows[1:]
+
+    entries = []
     for row in rows:
+        row_dict = row.as_dict()
         text = json.dumps(
-            row["definition"], indent=2, sort_keys=True, ensure_ascii=False
+            row_dict["definition"], indent=2, sort_keys=True, ensure_ascii=False
         )
         has_previous = previous_text is not None
         diff = (
@@ -171,7 +193,7 @@ def history(schema_type: str) -> str:
         )
         entries.append(
             {
-                **row,
+                **row_dict,
                 "has_previous": has_previous,
                 "diff": _highlight_diff(diff) if diff else diff,
                 "definition_text": text,
@@ -185,7 +207,13 @@ def history(schema_type: str) -> str:
         "scheming_dynamic/schema_history.html",
         {
             "schema_type": schema_type,
-            "entries": entries,
+            "page": Page(
+                entries,
+                page=page_number,
+                items_per_page=HISTORY_PAGE_SIZE,
+                item_count=total,
+                presliced_list=True,
+            ),
             "active_tab": "history",
         },
     )
@@ -214,24 +242,34 @@ def _highlight_diff(diff_text: str) -> Markup:
 
 def history_index() -> str:
     """List every schema_type with recorded activity, live or deleted."""
+    entity_type = DEFAULT_ENTITY_TYPE
+    page_number = tk.h.get_page_number(tk.request.args)
+
+    total = SchemingSchemaActivity.count_schema_types(entity_type)
+    offset = (page_number - 1) * SCHEMA_TYPES_PAGE_SIZE
+    schema_types = SchemingSchemaActivity.get_schema_types(
+        entity_type, limit=SCHEMA_TYPES_PAGE_SIZE, offset=offset
+    )
+
     live = {
-        row.schema_type
-        for row in SchemingSchemaVersion.get_heads_of_type(DEFAULT_ENTITY_TYPE)
+        row.schema_type for row in SchemingSchemaVersion.get_heads_of_type(entity_type)
     }
+
+    rows = [
+        {"schema_type": t, "entity_type": entity_type, "is_live": t in live}
+        for t in schema_types
+    ]
 
     return tk.render(
         "scheming_dynamic/history_index.html",
         {
-            "rows": [
-                {
-                    "schema_type": schema_type,
-                    "entity_type": DEFAULT_ENTITY_TYPE,
-                    "is_live": schema_type in live,
-                }
-                for schema_type in SchemingSchemaActivity.get_schema_types(
-                    DEFAULT_ENTITY_TYPE
-                )
-            ],
+            "page": Page(
+                rows,
+                page=page_number,
+                items_per_page=SCHEMA_TYPES_PAGE_SIZE,
+                item_count=total,
+                presliced_list=True,
+            ),
             "active_tab": "history",
         },
     )

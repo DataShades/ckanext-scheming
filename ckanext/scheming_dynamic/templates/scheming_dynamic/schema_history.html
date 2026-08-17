@@ -25,9 +25,9 @@
 
   <h1 class="page-heading">{{ _('History for {type} schema').format(type=schema_type) }}</h1>
 
-  {% if entries %}
+  {% if page.items %}
     <div class="accordion" id="schema-history-accordion">
-      {% for entry in entries %}
+      {% for entry in page.items %}
         <div class="accordion-item">
           <h2 class="accordion-header" id="schema-history-heading-{{ loop.index }}">
             <button class="accordion-button collapsed" type="button"
@@ -60,7 +60,7 @@
                 <p class="text-muted">{{ _('No change to the definition.') }}</p>
               {% endif %}
 
-              {% if not loop.first or entry.action == 'delete' %}
+              {% if not (page.page == 1 and loop.first) or entry.action == 'delete' %}
                 <form method="post" action="{% url_for 'scheming_dynamic_admin.restore', schema_type=schema_type, activity_id=entry.id %}">
                   {{ h.csrf_input() }}
                   <a type="submit" class="btn btn-secondary btn-sm mt-2"
@@ -79,6 +79,7 @@
         </div>
       {% endfor %}
     </div>
+    {{ page.pager(schema_type=schema_type) }}
   {% else %}
     <p class="empty">{{ _('No history recorded for this schema type.') }}</p>
   {% endif %}

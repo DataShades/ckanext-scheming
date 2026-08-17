@@ -374,26 +374,66 @@ class SchemingSchemaActivity(tk.BaseModel):
         return model.Session.get(cls, id)
 
     @classmethod
-    def get_history(cls, entity_type: str, schema_type: str) -> list[Self]:
-        """All activity rows for a schema_type, oldest first."""
-        return (
+    def get_history(
+        cls,
+        entity_type: str,
+        schema_type: str,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Self]:
+        """Activity rows for a schema_type, oldest first.
+
+        With ``limit`` set and ``offset > 0``, also includes the one row
+        immediately before ``offset`` as diff context, so a paginated
+        caller can still diff the page's first entry against what came
+        before it -- callers slicing for display should drop that leading
+        context row themselves.
+        """
+        query = (
             model.Session.query(cls)
             .filter(cls.entity_type == entity_type, cls.schema_type == schema_type)
             .order_by(cls.created)
-            .all()
+        )
+        if limit is not None:
+            if offset > 0:
+                query = query.offset(offset - 1).limit(limit + 1)
+            else:
+                query = query.limit(limit)
+        return query.all()
+
+    @classmethod
+    def count_history(cls, entity_type: str, schema_type: str) -> int:
+        """How many activity rows exist for a schema_type."""
+        return (
+            model.Session.query(cls.id)
+            .filter(cls.entity_type == entity_type, cls.schema_type == schema_type)
+            .count()
         )
 
     @classmethod
-    def get_schema_types(cls, entity_type: str) -> list[str]:
+    def get_schema_types(
+        cls, entity_type: str, limit: int | None = None, offset: int = 0
+    ) -> list[str]:
         """Every schema_type with recorded activity, live or deleted."""
-        rows = (
+        query = (
             model.Session.query(cls.schema_type, sa.func.max(cls.created))
             .filter(cls.entity_type == entity_type)
             .group_by(cls.schema_type)
             .order_by(sa.func.max(cls.created).desc())
-            .all()
         )
-        return [schema_type for schema_type, _ in rows]
+        if limit is not None:
+            query = query.limit(limit).offset(offset)
+        return [schema_type for schema_type, _ in query.all()]
+
+    @classmethod
+    def count_schema_types(cls, entity_type: str) -> int:
+        """How many distinct schema_types have recorded activity."""
+        return (
+            model.Session.query(cls.schema_type)
+            .filter(cls.entity_type == entity_type)
+            .distinct()
+            .count()
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
