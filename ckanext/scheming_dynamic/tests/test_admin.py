@@ -116,6 +116,26 @@ class TestSchemaList:
 
         assert "No dynamic schemas" in resp.body
 
+    def test_unpinned_schema_shows_mutable(self, app, dataset_schema: dict[str, Any]):
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.index"), headers=_sysadmin_headers()
+        )
+
+        assert "fa-lock-open" in resp.body
+        assert 'class="fa fa-lock ' not in resp.body
+
+    def test_pinned_schema_shows_locked_version(
+        self, app, dataset_schema: dict[str, Any]
+    ):
+        factories.Dataset(type="test-type")  # locks/pins version 1
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.index"), headers=_sysadmin_headers()
+        )
+
+        assert 'class="fa fa-lock ' in resp.body
+        assert "fa-lock-open" not in resp.body
+
 
 class TestSchemaCreate:
     def test_form_renders(self, app):
@@ -255,9 +275,30 @@ class TestSchemaEdit:
         )
 
         assert resp.status_code == STATUS_OK
+        assert "now at version 1" in resp.body
         schema = SchemingSchemaVersion.head("dataset", "test-type")
         assert schema
         assert schema.definition["dataset_fields"][0]["field_name"] == "renamed_field"
+
+    def test_forked_version_is_reported_in_flash(
+        self, app, dataset_schema: dict[str, Any], schema_definition
+    ):
+        factories.Dataset(type="test-type")  # locks/pins version 1
+
+        updated = {
+            **schema_definition,
+            "dataset_fields": [{"field_name": "renamed_field"}],
+        }
+
+        resp = app.post(
+            tk.h.url_for("scheming_dynamic_admin.edit", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+            data={"definition": json.dumps(updated)},
+        )
+
+        assert resp.status_code == STATUS_OK
+        assert "now at version 2" in resp.body
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 2
 
     def test_invalid_definition_is_reported(
         self, app, dataset_schema: dict[str, Any], schema_definition

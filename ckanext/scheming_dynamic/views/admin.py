@@ -15,6 +15,7 @@ from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
     SchemingSchemaActivity,
+    SchemingSchemaPin,
     SchemingSchemaVersion,
 )
 from ckanext.scheming_dynamic.preset_resolve import (
@@ -40,12 +41,22 @@ def _preset_meta_schema(exclude_preset_name: str | None = None) -> dict[str, Any
 
 
 def index() -> str:
+    schemas = [
+        {
+            "schema_type": row.schema_type,
+            "entity_type": row.entity_type,
+            "created": row.created,
+            "version": row.version,
+            "is_locked": SchemingSchemaPin.is_version_locked(
+                row.entity_type, row.schema_type, row.version
+            ),
+        }
+        for row in SchemingSchemaVersion.get_heads_of_type(DEFAULT_ENTITY_TYPE)
+    ]
+
     return tk.render(
         "scheming_dynamic/index.html",
-        {
-            "schemas": SchemingSchemaVersion.get_heads_of_type(DEFAULT_ENTITY_TYPE),
-            "active_tab": "schemas",
-        },
+        {"schemas": schemas, "active_tab": "schemas"},
     )
 
 
@@ -120,13 +131,17 @@ class EditView(MethodView):
         }
 
         try:
-            tk.get_action("scheming_schema_update")({}, dict(data))
+            row = tk.get_action("scheming_schema_update")({}, dict(data))
         except tk.ObjectNotFound:
             return tk.abort(404, tk._("Schema not found"))
         except tk.ValidationError as e:
             return self.get(schema_type, data, e.error_dict, e.error_summary)
 
-        tk.h.flash_success(tk._("Schema '{}' updated.").format(schema_type))
+        tk.h.flash_success(
+            tk._("Schema '{}' updated; now at version {}.").format(
+                schema_type, row["version"]
+            )
+        )
         return tk.redirect_to(f"{ADMIN_BP}.index")
 
 
