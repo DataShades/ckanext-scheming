@@ -5,6 +5,12 @@ DEFAULT_ENTITY_TYPE = "dataset"
 # TODO: group/organization dynamic schemas are not supported yet
 ENTITY_TYPES = [DEFAULT_ENTITY_TYPE]
 
+TYPE_FIELDS = {
+    "dataset": "dataset_type",
+    "group": "group_type",
+    "organization": "organization_type",
+}
+
 
 @validator_args
 def scheming_schema_create(  # noqa: PLR0913

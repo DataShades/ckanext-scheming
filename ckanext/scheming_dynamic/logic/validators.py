@@ -7,7 +7,7 @@ from ckan.lib.navl.dictization_functions import missing
 
 from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic import sync
-from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
+from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE, TYPE_FIELDS
 from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
 from ckanext.scheming_dynamic.preset_resolve import (
     PresetBaseNotFoundError,
@@ -52,6 +52,10 @@ def scheming_definition_valid(
     errs = list(iter_errors(definition, schema_cls()))
     if errs:
         raise tk.Invalid("; ".join(f"{error_location(e)}: {e.message}" for e in errs))
+
+    type_field = TYPE_FIELDS[entity_type]
+    if definition[type_field].endswith("_resource"):
+        raise tk.Invalid(tk._(f"'{type_field}' must not end with '_resource'."))
 
     try:
         _expand_schemas({definition["dataset_type"]: definition})

@@ -73,6 +73,18 @@ class TestSchemingSchemaCreate:
                 },
             )
 
+    def test_dataset_type_ending_in_resource_is_rejected(self, schema_definition):
+        # "_resource" is the suffix CKAN appends to build a type-specific
+        # resource blueprint name; a real type named that way collides with
+        # it (see build_dynamic_type_url) and can misroute URLs for either
+        # type, or crash schema rendering outright
+        definition = {**schema_definition, "dataset_type": "test-type_resource"}
+
+        with pytest.raises(tk.ValidationError) as err:
+            helpers.call_action("scheming_schema_create", definition=definition)
+
+        assert "must not end with '_resource'" in str(err.value.error_dict["definition"])
+
     def test_empty_definition_is_rejected(self):
         with pytest.raises(tk.ValidationError) as err:
             helpers.call_action("scheming_schema_create", definition={})

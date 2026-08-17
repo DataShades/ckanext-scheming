@@ -24,12 +24,6 @@ from ckanext.scheming_dynamic.preset_resolve import (
 )
 from ckanext.scheming_dynamic.render import render_preset_field, render_schema_form
 
-TYPE_FIELDS = {
-    "dataset": "dataset_type",
-    "group": "group_type",
-    "organization": "organization_type",
-}
-
 
 @validate(schema.scheming_schema_create)
 def scheming_schema_create(context: Any, data_dict: dict[str, Any]) -> dict[str, Any]:
@@ -46,7 +40,7 @@ def scheming_schema_create(context: Any, data_dict: dict[str, Any]) -> dict[str,
     entity_type = data_dict["entity_type"]
     definition = data_dict["definition"]
 
-    schema_type = definition[TYPE_FIELDS[entity_type]]
+    schema_type = definition[schema.TYPE_FIELDS[entity_type]]
 
     if SchemingSchemaVersion.head_version(entity_type, schema_type):
         raise tk.ValidationError(
@@ -91,7 +85,7 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
     if not SchemingSchemaVersion.head_version(entity_type, schema_type):
         raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
-    type_field = TYPE_FIELDS[entity_type]
+    type_field = schema.TYPE_FIELDS[entity_type]
     if definition[type_field] != schema_type:
         raise tk.ValidationError(
             {
