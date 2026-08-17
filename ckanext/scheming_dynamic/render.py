@@ -39,6 +39,8 @@ def render_schema_form(dataset_type: str, definition: dict[str, Any]) -> str:
     Raises whatever exception schema expansion or the form snippet render
     raises if the schema can't be expanded/rendered.
     """
+    sync.ensure_presets_synced()
+
     expanded = _expand_schemas({dataset_type: definition})[dataset_type]
 
     # Lets build_dynamic_type_url() resolve this type's URLs (e.g. the slug

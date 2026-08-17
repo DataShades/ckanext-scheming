@@ -8,7 +8,11 @@ import pytest
 import ckan.plugins.toolkit as tk
 from ckan.tests import factories, helpers
 
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
+from ckanext.scheming_dynamic.model import (
+    SchemingPreset,
+    SchemingSchemaActivity,
+    SchemingSchemaVersion,
+)
 from ckanext.scheming_dynamic.tests import factories as scheming_factories
 
 STATUS_OK = 200
@@ -320,12 +324,11 @@ class TestSchemaHistory:
         )
 
     def test_shows_create_entry(self, app, schema_definition):
-        with app.flask_app.test_request_context():
-            helpers.call_action(
-                "scheming_schema_create",
-                context={"user": factories.Sysadmin()["name"]},
-                definition=schema_definition,
-            )
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": factories.Sysadmin()["name"]},
+            definition=schema_definition,
+        )
 
         resp = app.get(
             tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
@@ -343,6 +346,369 @@ class TestSchemaHistory:
 
         assert resp.status_code == STATUS_OK
         assert "No history recorded" in resp.body
+
+    def test_no_restore_button_for_the_current_state(self, app, schema_definition):
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": factories.Sysadmin()["name"]},
+            definition=schema_definition,
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "Restore this version" not in resp.body
+
+    def test_restore_button_shown_for_older_entries(self, app, schema_definition):
+        sysadmin = factories.Sysadmin()["name"]
+        updated = {
+            **schema_definition,
+            "dataset_fields": [{"field_name": "renamed_field"}],
+        }
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        helpers.call_action(
+            "scheming_schema_update",
+            context={"user": sysadmin},
+            schema_type="test-type",
+            definition=updated,
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        # only the older (create) entry gets a restore button, not the
+        # newest (update) entry, since that one already is the live state
+        assert resp.body.count("Restore the schema to this definition") == 1
+
+    def test_restore_button_shown_on_a_newest_delete_entry(
+        self, app, schema_definition
+    ):
+        sysadmin = factories.Sysadmin()["name"]
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        helpers.call_action(
+            "scheming_schema_delete",
+            context={"user": sysadmin},
+            schema_type="test-type",
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        # both entries get a button: the delete (newest, but undo-able) and
+        # the create (older)
+        assert resp.body.count("Restore the schema to this definition") == 2
+
+    def test_initial_entry_shows_full_definition_not_a_diff(
+        self, app, schema_definition
+    ):
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": factories.Sysadmin()["name"]},
+            definition=schema_definition,
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "Initial definition:" in resp.body
+        assert "Diff from previous version:" not in resp.body
+        assert "temporal_coverage" in resp.body
+
+    def test_changed_entry_shows_a_highlighted_diff(self, app, schema_definition):
+        sysadmin = factories.Sysadmin()["name"]
+        updated = {
+            **schema_definition,
+            "dataset_fields": [{"field_name": "renamed_field"}],
+        }
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        helpers.call_action(
+            "scheming_schema_update",
+            context={"user": sysadmin},
+            schema_type="test-type",
+            definition=updated,
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "Diff from previous version:" in resp.body
+        assert "No change to the definition." not in resp.body
+        assert 'class="diff-add"' in resp.body
+        assert 'class="diff-del"' in resp.body
+        assert "renamed_field" in resp.body
+
+    def test_unchanged_update_shows_no_change_message(self, app, schema_definition):
+        sysadmin = factories.Sysadmin()["name"]
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        # re-submit the exact same definition -- nothing actually
+        # changes, but an activity row is still written
+        helpers.call_action(
+            "scheming_schema_update",
+            context={"user": sysadmin},
+            schema_type="test-type",
+            definition=schema_definition,
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "No change to the definition." in resp.body
+        assert "Diff from previous version:" not in resp.body
+
+    def test_delete_entry_shows_deleted_message_not_a_diff(
+        self, app, schema_definition
+    ):
+        sysadmin = factories.Sysadmin()["name"]
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        helpers.call_action(
+            "scheming_schema_delete",
+            context={"user": sysadmin},
+            schema_type="test-type",
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "Schema deleted." in resp.body
+        # the delete activity's definition is identical to the create
+        # entry's (nothing changed it in between), which would otherwise
+        # hit the "no change" branch -- 'delete' must be checked first
+        assert "No change to the definition." not in resp.body
+        assert "Diff from previous version:" not in resp.body
+
+    def test_entries_are_ordered_newest_first(self, app, schema_definition):
+        sysadmin = factories.Sysadmin()["name"]
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=schema_definition,
+        )
+        helpers.call_action(
+            "scheming_schema_delete",
+            context={"user": sysadmin},
+            schema_type="test-type",
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.body.index(">delete<") < resp.body.index(">create<")
+
+    def test_non_ascii_definition_is_not_escaped(self, app, schema_definition):
+        sysadmin = factories.Sysadmin()["name"]
+        multilingual = {
+            **schema_definition,
+            "dataset_fields": [
+                {"field_name": "temporal_coverage", "label": {"uk_UA": "Назва"}}
+            ],
+        }
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": sysadmin},
+            definition=multilingual,
+        )
+
+        resp = app.get(
+            tk.url_for("scheming_dynamic_admin.history", schema_type="test-type"),
+            headers=_sysadmin_headers(),
+        )
+
+        assert "Назва" in resp.body
+        assert "\\u041d" not in resp.body
+
+
+class TestSchemaRestore:
+    def _create(self, app, definition: dict) -> SchemingSchemaActivity:
+        helpers.call_action(
+            "scheming_schema_create",
+            context={"user": factories.Sysadmin()["name"]},
+            definition=definition,
+        )
+        history = SchemingSchemaActivity.get_history(
+            "dataset", definition["dataset_type"]
+        )
+        return history[0]
+
+    def test_anonymous_is_forbidden(self, app, schema_definition):
+        entry = self._create(app, schema_definition)
+
+        app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="test-type",
+                activity_id=entry.id,
+            ),
+            status=STATUS_FORBIDDEN,
+        )
+
+    def test_regular_user_is_forbidden(self, app, schema_definition):
+        entry = self._create(app, schema_definition)
+
+        app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="test-type",
+                activity_id=entry.id,
+            ),
+            headers={"Authorization": factories.UserWithToken()["token"]},
+            status=STATUS_FORBIDDEN,
+        )
+
+    def test_restore_overwrites_an_unpinned_head(self, app, schema_definition):
+        create_entry = self._create(app, schema_definition)
+
+        updated = {
+            **schema_definition,
+            "dataset_fields": [{"field_name": "renamed_field"}],
+        }
+        helpers.call_action(
+            "scheming_schema_update",
+            context={"user": factories.Sysadmin()["name"]},
+            schema_type="test-type",
+            definition=updated,
+        )
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 1
+
+        resp = app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="test-type",
+                activity_id=create_entry.id,
+            ),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.status_code == STATUS_OK
+        assert "restored" in resp.body
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 1
+        head = SchemingSchemaVersion.head("dataset", "test-type")
+        assert head
+        assert head.definition == schema_definition
+
+        history = SchemingSchemaActivity.get_history("dataset", "test-type")
+        assert [h.action for h in history] == ["create", "update", "update"]
+
+    def test_restore_forks_a_new_version_when_head_is_pinned(
+        self, app, schema_definition
+    ):
+        create_entry = self._create(app, schema_definition)
+        factories.Dataset(type="test-type")  # locks/pins version 1
+
+        updated = {
+            **schema_definition,
+            "dataset_fields": [{"field_name": "renamed_field"}],
+        }
+        helpers.call_action(
+            "scheming_schema_update",
+            context={"user": factories.Sysadmin()["name"]},
+            schema_type="test-type",
+            definition=updated,
+        )
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 2
+
+        factories.Dataset(type="test-type")  # locks/pins version 2
+
+        resp = app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="test-type",
+                activity_id=create_entry.id,
+            ),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.status_code == STATUS_OK
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 3
+        head = SchemingSchemaVersion.head("dataset", "test-type")
+        assert head
+        assert head.definition == schema_definition
+
+    def test_restore_recreates_a_deleted_schema(self, app, schema_definition):
+        create_entry = self._create(app, schema_definition)
+
+        helpers.call_action(
+            "scheming_schema_delete",
+            context={"user": factories.Sysadmin()["name"]},
+            schema_type="test-type",
+        )
+        assert SchemingSchemaVersion.head("dataset", "test-type") is None
+
+        resp = app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="test-type",
+                activity_id=create_entry.id,
+            ),
+            headers=_sysadmin_headers(),
+        )
+
+        assert resp.status_code == STATUS_OK
+        head = SchemingSchemaVersion.head("dataset", "test-type")
+        assert head
+        assert head.definition == schema_definition
+
+    def test_unknown_activity_id_is_not_found(self, app, dataset_schema):
+        app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="test-type",
+                activity_id="does-not-exist",
+            ),
+            headers=_sysadmin_headers(),
+            status=STATUS_NOT_FOUND,
+        )
+
+    def test_activity_from_another_schema_type_is_not_found(
+        self, app, schema_definition
+    ):
+        entry = self._create(app, schema_definition)
+        self._create(app, {**schema_definition, "dataset_type": "other-type"})
+
+        app.post(
+            tk.h.url_for(
+                "scheming_dynamic_admin.restore",
+                schema_type="other-type",
+                activity_id=entry.id,
+            ),
+            headers=_sysadmin_headers(),
+            status=STATUS_NOT_FOUND,
+        )
 
 
 class TestSchemaPreview:

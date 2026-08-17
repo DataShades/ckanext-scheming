@@ -125,7 +125,10 @@ def sync(ctx: click.Context, entity_type: str, schema_type: str):
             )
             return
 
-        existing = cast(SchemingSchemaVersion, SchemingSchemaVersion.get(entity_type, schema_type, head_version))
+        existing = cast(
+            SchemingSchemaVersion,
+            SchemingSchemaVersion.get(entity_type, schema_type, head_version),
+        )
 
         if existing.definition == definition:
             click.secho(
@@ -194,30 +197,22 @@ def pin(
     target_version = _get_target_version(ctx, entity_type, schema_type, version)
 
     context = _site_user_context()
-    validator = Validator(
-        entity_type, schema_type, context["user"]  # type: ignore
-    )
+    validator = Validator(entity_type, schema_type, context["user"])  # type: ignore
 
     pinned = failed = 0
 
     for entity in _unpinned_entities(entity_type, schema_type):
-        if not no_validate and _validation_failed(
-            validator, entity, target_version
-        ):
+        if not no_validate and _validation_failed(validator, entity, target_version):
             failed += 1
             continue
 
-        SchemingSchemaPin.pin(
-            entity_type, entity.id, schema_type, target_version
-        )
+        SchemingSchemaPin.pin(entity_type, entity.id, schema_type, target_version)
         model.Session.commit()
         pinned += 1
 
     summary = f"Pinned {pinned} {entity_type}(s) to version {target_version}"
     if failed:
-        summary += (
-            f", {failed} failed validation and were left unpinned"
-        )
+        summary += f", {failed} failed validation and were left unpinned"
 
     click.secho(summary, fg="yellow" if failed else "green")
     ctx.exit(1 if failed else 0)
@@ -241,9 +236,7 @@ def _get_target_version(
 
     target_version = head if version is None else version
 
-    if SchemingSchemaVersion.get(
-        entity_type, schema_type, target_version
-    ) is None:
+    if SchemingSchemaVersion.get(entity_type, schema_type, target_version) is None:
         click.secho(
             f"Version {target_version} does not exist.",
             fg="red",
@@ -371,7 +364,7 @@ class Validator:
         SchemingSchemaPin.pin(self.entity_type, entity.id, self.schema_type, version)
 
         try:
-            raw_dict = self._dictize_func(entity, context) # type: ignore
+            raw_dict = self._dictize_func(entity, context)  # type: ignore
             shown, _ = lib_plugins.plugin_validate(
                 self.plugin, context, raw_dict, self._show_schema(), self._show_action
             )

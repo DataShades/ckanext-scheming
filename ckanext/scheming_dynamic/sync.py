@@ -50,9 +50,10 @@ def dataset_schemas_if_changed(
     ensure_presets_synced()
 
     state = _SchemingMixin.dynamic_scheming["schema"]
+    preset_fingerprint = _SchemingMixin.dynamic_scheming["preset"]["fingerprint"]
 
     try:
-        fingerprint = SchemingState.fingerprint("dataset")
+        fingerprint = (SchemingState.fingerprint("dataset"), preset_fingerprint)
     except (DBAPIError, UnboundExecutionError):
         model.Session.rollback()
         log.debug("cannot read the scheming_state table")

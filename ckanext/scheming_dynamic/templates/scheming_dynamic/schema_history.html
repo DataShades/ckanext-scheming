@@ -59,6 +59,21 @@
               {% else %}
                 <p class="text-muted">{{ _('No change to the definition.') }}</p>
               {% endif %}
+
+              {% if not loop.first or entry.action == 'delete' %}
+                <form method="post" action="{% url_for 'scheming_dynamic_admin.restore', schema_type=schema_type, activity_id=entry.id %}">
+                  {{ h.csrf_input() }}
+                  <a type="submit" class="btn btn-secondary btn-sm mt-2"
+                      data-module="confirm-action"
+                      data-module-with-data="true"
+                      data-module-content="{{ _('Restore the schema to this definition? This creates a new entry in the history, it does not delete anything.') }}"
+                      aria-label="{{ _('Restore this version') }}"
+                      data-bs-title="{{ _('Restore this version') }}"
+                      data-bs-toggle="tooltip">
+                    <i class="fa fa-undo"></i> {{ _('Restore this version') }}
+                  </a>
+                </form>
+              {% endif %}
             </div>
           </div>
         </div>

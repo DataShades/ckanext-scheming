@@ -136,7 +136,10 @@ def _lock_or_sync_version(
     if SchemingSchemaPin.is_version_locked(entity_type, schema_type, head_version):
         return SchemingSchemaVersion.lock(entity_type, schema_type, definition)
 
-    existing = cast(SchemingSchemaVersion, SchemingSchemaVersion.get(entity_type, schema_type, head_version))
+    existing = cast(
+        SchemingSchemaVersion,
+        SchemingSchemaVersion.get(entity_type, schema_type, head_version),
+    )
     existing.definition = definition
     return existing
 

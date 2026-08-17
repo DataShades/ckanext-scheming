@@ -260,6 +260,35 @@ def _preview_errors(messages: list[str]) -> Any:
     return body, 400
 
 
+def restore(schema_type: str, activity_id: str) -> Any:
+    """Re-apply a historical activity entry's definition to the schema."""
+    entry = SchemingSchemaActivity.get(activity_id)
+
+    if (
+        not entry
+        or entry.schema_type != schema_type
+        or entry.entity_type != DEFAULT_ENTITY_TYPE
+    ):
+        return tk.abort(404, tk._("Activity entry not found"))
+
+    if SchemingSchemaVersion.head(DEFAULT_ENTITY_TYPE, schema_type):
+        action, data = "scheming_schema_update", {
+            "schema_type": schema_type,
+            "definition": entry.definition,
+        }
+    else:
+        action, data = "scheming_schema_create", {"definition": entry.definition}
+
+    try:
+        tk.get_action(action)({}, data)
+    except tk.ValidationError as e:
+        tk.h.flash_error("; ".join(e.error_summary.values()))
+    else:
+        tk.h.flash_success(tk._("Schema '{}' restored.").format(schema_type))
+
+    return tk.redirect_to(f"{ADMIN_BP}.history", schema_type=schema_type)
+
+
 def delete(schema_type: str) -> Any:
     try:
         tk.get_action("scheming_schema_delete")({}, {"schema_type": schema_type})
@@ -434,6 +463,9 @@ bp.add_url_rule("/new", view_func=CreateView.as_view("new"))
 bp.add_url_rule("/<schema_type>/edit", view_func=EditView.as_view("edit"))
 bp.add_url_rule("/history", view_func=history_index)
 bp.add_url_rule("/<schema_type>/history", view_func=history)
+bp.add_url_rule(
+    "/<schema_type>/history/<activity_id>/restore", view_func=restore, methods=["POST"]
+)
 bp.add_url_rule("/<schema_type>/delete", view_func=delete, methods=["POST"])
 bp.add_url_rule("/preview", view_func=preview, methods=["POST"])
 bp.add_url_rule("/presets/", view_func=presets_index)

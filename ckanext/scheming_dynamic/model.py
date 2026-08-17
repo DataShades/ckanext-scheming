@@ -370,6 +370,10 @@ class SchemingSchemaActivity(tk.BaseModel):
         return row
 
     @classmethod
+    def get(cls, id: str) -> Self | None:
+        return model.Session.get(cls, id)
+
+    @classmethod
     def get_history(cls, entity_type: str, schema_type: str) -> list[Self]:
         """All activity rows for a schema_type, oldest first."""
         return (
