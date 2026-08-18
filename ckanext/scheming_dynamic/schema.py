@@ -449,7 +449,7 @@ class PresetSchema(BaseSchema):
                 "type": "object",
                 "title": tk._("Values"),
                 "required": [],
-                "properties": properties,
+                "properties": {**properties, "start_form_page": False},
                 "additionalProperties": True,
                 "x-deactivateNonRequired": True,
                 "x-navWarning": False,
