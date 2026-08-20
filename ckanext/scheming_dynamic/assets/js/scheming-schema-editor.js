@@ -233,7 +233,7 @@ ckan.module('scheming-schema-editor', function ($) {
         try {
           JSON.parse(raw);
           return;
-        } catch (err) {}
+        } catch (err) { }
 
         var parsed;
         try {
@@ -300,7 +300,6 @@ ckan.module('scheming-schema-editor', function ($) {
         this.textarea.value = JSON.stringify(this.editor.getValue(), null, 2);
       }
 
-      var self = this;
       fetch(this.options.previewUrl, {
         method: 'POST',
         body: new FormData(this.form)
@@ -308,17 +307,55 @@ ckan.module('scheming-schema-editor', function ($) {
         .then(function (response) {
           return response.text();
         })
-        .then(function (html) {
-          self.previewContent.innerHTML = html;
-          self.form.hidden = true;
-          self.previewPane.hidden = false;
-          jQuery('[data-module]', self.previewContent).each(function () {
-            ckan.module.initializeElement(this);
-          });
-        })
+        .then(this._renderPreview.bind(this))
         .catch(function () {
-          self._showErrors([self._('The preview could not be loaded.')]);
+          this._showErrors([this._('The preview could not be loaded.')]);
+        }.bind(this));
+    },
+
+    _renderPreview: function (html) {
+      this.previewContent.innerHTML = html;
+      this.form.hidden = true;
+      this.previewPane.hidden = false;
+
+      var pending = this._loadPreviewScripts();
+
+      return Promise.all(pending).then(function () {
+        htmx_initialize_ckan_modules({
+          detail: { target: this.previewContent }
         });
+      }.bind(this));
+    },
+
+    _loadPreviewScripts: function () {
+      this._loadedScripts = this._loadedScripts || {};
+
+      var pending = [];
+
+      this.previewContent.querySelectorAll('script').forEach(function (node) {
+        if (node.src && this._loadedScripts[node.src]) {
+          node.remove();
+          return;
+        }
+
+        var script = document.createElement('script');
+
+        if (node.src) {
+          this._loadedScripts[node.src] = true;
+
+          pending.push(new Promise(function (resolve) {
+            script.onload = resolve;
+            script.onerror = resolve;
+            script.src = node.src;
+          }));
+        } else {
+          script.textContent = node.textContent;
+        }
+
+        node.replaceWith(script);
+      }.bind(this));
+
+      return pending;
     },
 
     _onPreviewClose: function () {
@@ -339,7 +376,7 @@ ckan.module('scheming-schema-editor', function ($) {
       this.errorBox.hidden = false;
 
       if (!options || options.scroll !== false) {
-        this.errorBox.scrollIntoView({behavior: 'smooth', block: 'center'});
+        this.errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     },
 

@@ -300,9 +300,11 @@ def preview() -> Any:
     dataset_type = definition["dataset_type"]
 
     try:
-        return render_schema_form(dataset_type, definition)
+        body = render_schema_form(dataset_type, definition)
     except Exception as e:  # noqa: BLE001
         return _preview_errors([tk._("Schema cannot be rendered: {}").format(e)])
+
+    return _with_queued_assets(body)
 
 
 def _preview_errors(messages: list[str]) -> Any:
@@ -311,6 +313,15 @@ def _preview_errors(messages: list[str]) -> Any:
         {"preview_errors": messages},
     )
     return body, 400
+
+
+def _with_queued_assets(body: str) -> str:
+    """Append the <link>/<script> tags for assets the just-rendered form."""
+    return "".join([
+        str(body),
+        str(tk.h.render_assets("style")),
+        str(tk.h.render_assets("script")),
+    ])
 
 
 def restore(schema_type: str, activity_id: str) -> Any:
@@ -472,7 +483,7 @@ def preset_preview() -> Any:
     preset_name = definition["preset_name"]
 
     try:
-        return render_preset_field(preset_name, definition["values"])
+        body = render_preset_field(preset_name, definition["values"])
     except PresetCycleError as e:
         return _preset_preview_errors(
             [
@@ -489,6 +500,8 @@ def preset_preview() -> Any:
         return _preset_preview_errors(
             [tk._("Form snippet failed to render: {}").format(e)]
         )
+
+    return _with_queued_assets(body)
 
 
 def _preset_preview_errors(messages: list[str]) -> Any:
