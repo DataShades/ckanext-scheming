@@ -83,7 +83,9 @@ class TestSchemingSchemaCreate:
         with pytest.raises(tk.ValidationError) as err:
             helpers.call_action("scheming_schema_create", definition=definition)
 
-        assert "must not end with '_resource'" in str(err.value.error_dict["definition"])
+        assert "must not end with '_resource'" in str(
+            err.value.error_dict["definition"]
+        )
 
     def test_empty_definition_is_rejected(self):
         with pytest.raises(tk.ValidationError) as err:

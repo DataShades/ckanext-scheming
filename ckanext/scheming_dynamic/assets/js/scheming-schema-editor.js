@@ -266,18 +266,17 @@ ckan.module('scheming-schema-editor', function ($) {
       this._clearErrors();
     },
 
-    _onSubmit: function (event) {
+    _validateDefinition: function () {
       if (!this.formMode) {
         var parsed;
         try {
           parsed = this._parseDefinition(this.textarea.value);
         } catch (err) {
-          event.preventDefault();
           this._showErrors([this._('Definition is not valid JSON: ') + err.message]);
-          return;
+          return false;
         }
         this.textarea.value = JSON.stringify(parsed, null, 2);
-        return;
+        return true;
       }
 
       this.textarea.value = JSON.stringify(this.editor.getValue(), null, 2);
@@ -285,19 +284,27 @@ ckan.module('scheming-schema-editor', function ($) {
       this.editor.validate();
       var errors = this.editor.getErrors();
       if (errors.length) {
-        event.preventDefault();
         this._showErrors(errors.map(function (error) {
           var path = error.path.replace(/^root\.?/, '') || 'schema';
           return path + ': ' + error.message;
         }));
+        return false;
+      }
+
+      return true;
+    },
+
+    _onSubmit: function (event) {
+      if (!this._validateDefinition()) {
+        event.preventDefault();
       }
     },
 
     _onPreview: function () {
       this._clearErrors();
 
-      if (this.formMode) {
-        this.textarea.value = JSON.stringify(this.editor.getValue(), null, 2);
+      if (!this._validateDefinition()) {
+        return;
       }
 
       fetch(this.options.previewUrl, {
@@ -361,6 +368,7 @@ ckan.module('scheming-schema-editor', function ($) {
     _onPreviewClose: function () {
       this.previewPane.hidden = true;
       this.form.hidden = false;
+      this.previewContent.innerHTML = '';
     },
 
     _showErrors: function (messages, options) {

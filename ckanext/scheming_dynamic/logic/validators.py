@@ -15,6 +15,7 @@ from ckanext.scheming_dynamic.preset_resolve import (
     resolve_preset_values,
 )
 from ckanext.scheming_dynamic.schema import SCHEMA_CLASSES, PresetSchema
+from ckanext.scheming_dynamic.schema_migration import mapping as mapping_lib
 from ckanext.scheming_dynamic.validator import error_location, iter_errors
 
 log = logging.getLogger(__name__)
@@ -230,6 +231,56 @@ def _field_uses_any_preset(field: dict[str, Any], names: set[str]) -> bool:
     )
 
 
+def scheming_migration_versions_valid(
+    key: types.FlattenKey,
+    data: types.FlattenDataDict,
+    errors: types.FlattenErrorDict,
+    context: types.Context,
+) -> Any:
+    """Both versions must exist and belong to the same schema."""
+    if errors.get(key):
+        return
+
+    entity_type = data[("entity_type",)]
+    schema_type = data[("schema_type",)]
+    from_version = data[("from_version",)]
+    to_version = data[key]
+
+    if from_version == to_version:
+        raise tk.Invalid(tk._("A migration needs two different versions."))
+
+    for version in (from_version, to_version):
+        if SchemingSchemaVersion.get(entity_type, schema_type, version) is None:
+            raise tk.Invalid(
+                tk._(f"Version {version} of '{schema_type}' does not exist.")
+            )
+
+
+def scheming_migration_mapping_valid(
+    key: types.FlattenKey,
+    data: types.FlattenDataDict,
+    errors: types.FlattenErrorDict,
+    context: types.Context,
+) -> Any:
+    """The mapping must only name fields the target schema actually has."""
+    if errors.get(key):
+        return
+
+    entity_type = data[("entity_type",)]
+    schema_type = data[("schema_type",)]
+    to_version = data[("to_version",)]
+
+    target = SchemingSchemaVersion.get(entity_type, schema_type, to_version)
+    if target is None:
+        return
+
+    expanded = _expand_schemas({schema_type: target.definition})[schema_type]
+
+    problems = mapping_lib.check(data[key], expanded)
+    if problems:
+        raise tk.Invalid("; ".join(problems))
+
+
 def get_validators():
     return {
         "scheming_default_entity_type": scheming_default_entity_type,
@@ -239,4 +290,6 @@ def get_validators():
         "scheming_preset_definition_valid": scheming_preset_definition_valid,
         "scheming_preset_exists": scheming_preset_exists,
         "scheming_preset_not_in_use": scheming_preset_not_in_use,
+        "scheming_migration_versions_valid": scheming_migration_versions_valid,
+        "scheming_migration_mapping_valid": scheming_migration_mapping_valid,
     }

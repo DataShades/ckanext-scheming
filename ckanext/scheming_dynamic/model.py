@@ -348,7 +348,7 @@ class SchemingSchemaActivity(tk.BaseModel):
     DELETE = "delete"
 
     @classmethod
-    def record( # noqa: PLR0913
+    def record(  # noqa: PLR0913
         cls,
         entity_type: str,
         schema_type: str,

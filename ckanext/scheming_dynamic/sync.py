@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 
 _expanded_version_cache: dict[tuple[str, str, int], dict[str, Any]] = {}
 
+SCHEMA_CHECKED_FLAG = "scheming_dynamic_schema_checked"
+PRESET_CHECKED_FLAG = "scheming_dynamic_preset_checked"
+
 
 def dataset_schemas_if_changed(
     static_schemas: dict[str, Any],
@@ -42,7 +45,7 @@ def dataset_schemas_if_changed(
     schema that fails to expand would never be retried until some unrelated
     write bumped the fingerprint again.
     """
-    if _checked_in_this_request("scheming_dynamic_schema_checked"):
+    if _checked_in_this_request(SCHEMA_CHECKED_FLAG):
         return None
 
     # dataset fields can reference DB-defined presets: their expansion below
@@ -101,7 +104,7 @@ def ensure_presets_synced() -> None:
     (cycle or missing base) is dropped and logged rather than breaking
     every other preset.
     """
-    if _checked_in_this_request("scheming_dynamic_preset_checked"):
+    if _checked_in_this_request(PRESET_CHECKED_FLAG):
         return
 
     state = _SchemingMixin.dynamic_scheming["preset"]
@@ -181,6 +184,19 @@ def reset() -> None:
     _SchemingMixin.dynamic_scheming["preset"] = {"fingerprint": None, "static": None}
     _SchemingMixin._presets = None
     _expanded_version_cache.clear()
+
+
+def forget_request_check() -> None:
+    """Make the next read re-check the database, as a new request would.
+
+    The per-request check means a schema locked after something already read
+    the schemas in the same request stays invisible until the next one.
+    """
+    if not has_request_context():
+        return
+
+    g.pop(SCHEMA_CHECKED_FLAG, None)
+    g.pop(PRESET_CHECKED_FLAG, None)
 
 
 def _checked_in_this_request(flag: str) -> bool:

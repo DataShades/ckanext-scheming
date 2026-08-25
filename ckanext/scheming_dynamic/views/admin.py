@@ -317,11 +317,13 @@ def _preview_errors(messages: list[str]) -> Any:
 
 def _with_queued_assets(body: str) -> str:
     """Append the <link>/<script> tags for assets the just-rendered form."""
-    return "".join([
-        str(body),
-        str(tk.h.render_assets("style")),
-        str(tk.h.render_assets("script")),
-    ])
+    return "".join(
+        [
+            str(body),
+            str(tk.h.render_assets("style")),
+            str(tk.h.render_assets("script")),
+        ]
+    )
 
 
 def restore(schema_type: str, activity_id: str) -> Any:
@@ -336,10 +338,13 @@ def restore(schema_type: str, activity_id: str) -> Any:
         return tk.abort(404, tk._("Activity entry not found"))
 
     if SchemingSchemaVersion.head(DEFAULT_ENTITY_TYPE, schema_type):
-        action, data = "scheming_schema_update", {
-            "schema_type": schema_type,
-            "definition": entry.definition,
-        }
+        action, data = (
+            "scheming_schema_update",
+            {
+                "schema_type": schema_type,
+                "definition": entry.definition,
+            },
+        )
     else:
         action, data = "scheming_schema_create", {"definition": entry.definition}
 

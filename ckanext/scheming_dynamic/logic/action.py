@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from contextlib import nullcontext
 from typing import Any, cast
 
@@ -23,6 +24,14 @@ from ckanext.scheming_dynamic.preset_resolve import (
     PresetCycleError,
 )
 from ckanext.scheming_dynamic.render import render_preset_field, render_schema_form
+from ckanext.scheming_dynamic.schema_migration import diff, runner, status
+from ckanext.scheming_dynamic.schema_migration import mapping as mapping_lib
+from ckanext.scheming_dynamic.schema_migration.apply import expanded_definition
+from ckanext.scheming_dynamic.schema_migration.model import (
+    MigrationRun,
+    MigrationRunItem,
+    SchemaMigration,
+)
 
 
 @validate(schema.scheming_schema_create)
@@ -329,3 +338,274 @@ def scheming_preset_delete(context: Any, data_dict: dict[str, Any]) -> bool:
     preset.delete()
 
     return True
+
+
+def _version_pair(data_dict: dict[str, Any]) -> tuple[str, str, int, int]:
+    return (
+        data_dict["entity_type"],
+        data_dict["schema_type"],
+        data_dict["from_version"],
+        data_dict["to_version"],
+    )
+
+
+@validate(schema.scheming_migration_status)
+def scheming_migration_status(
+    context: Any, data_dict: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Report how many datasets of each schema type lag behind its live version.
+
+    :param entity_type: the entity these schemas apply to (default: ``dataset``)
+    :type entity_type: string
+    :param schema_type: limit the report to a single schema type
+    :type schema_type: string
+    """
+    tk.check_access("scheming_migration_status", context, data_dict)
+
+    entity_type = data_dict["entity_type"]
+    schema_type = data_dict.get("schema_type")
+
+    if not schema_type:
+        return status.all_schema_types(entity_type)
+
+    head_version = SchemingSchemaVersion.head_version(entity_type, schema_type)
+    if not head_version:
+        raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
+
+    return [status.for_schema_type(entity_type, schema_type, head_version)]
+
+
+@validate(schema.scheming_migration_mapping_show)
+def scheming_migration_mapping_show(
+    context: Any, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Show the field mapping between two versions of one schema.
+
+    Returns the stored mapping (or the auto-derived suggestion when nothing is
+    stored yet), the field-by-field classification, and whatever still needs a
+    decision before the mapping can be applied.
+
+    :param schema_type: the schema being migrated
+    :type schema_type: string
+    :param from_version: the version datasets are currently pinned to
+    :type from_version: int
+    :param to_version: the version they should move to
+    :type to_version: int
+    :param entity_type: the entity this schema applies to (default: ``dataset``)
+    :type entity_type: string
+    """
+    tk.check_access("scheming_migration_mapping_show", context, data_dict)
+
+    entity_type, schema_type, from_version, to_version = _version_pair(data_dict)
+
+    source = expanded_definition(entity_type, schema_type, from_version)
+    target = expanded_definition(entity_type, schema_type, to_version)
+
+    changes = diff.compare(source, target)
+    suggested = mapping_lib.suggest(changes)
+
+    row = SchemaMigration.get(entity_type, schema_type, from_version, to_version)
+    current = row.mapping if row else suggested
+
+    return {
+        "entity_type": entity_type,
+        "schema_type": schema_type,
+        "from_version": from_version,
+        "to_version": to_version,
+        "stored": row.as_dict() if row else None,
+        "mapping": current,
+        "suggested": suggested,
+        "diff": {
+            group: dataclasses.asdict(group_diff)
+            for group, group_diff in changes.items()
+        },
+        "unresolved": mapping_lib.unresolved(changes, current),
+    }
+
+
+@validate(schema.scheming_migration_mapping_update)
+def scheming_migration_mapping_update(
+    context: Any, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Store the field mapping between two versions of one schema.
+
+    :param schema_type: the schema being migrated
+    :type schema_type: string
+    :param from_version: the version datasets are currently pinned to
+    :type from_version: int
+    :param to_version: the version they should move to
+    :type to_version: int
+    :param mapping: the mapping document
+    :type mapping: dict
+    :param entity_type: the entity this schema applies to (default: ``dataset``)
+    :type entity_type: string
+    """
+    tk.check_access("scheming_migration_mapping_update", context, data_dict)
+
+    entity_type, schema_type, from_version, to_version = _version_pair(data_dict)
+
+    row = SchemaMigration.save(
+        entity_type,
+        schema_type,
+        from_version,
+        to_version,
+        data_dict["mapping"],
+        context["user"],
+    )
+
+    return row.as_dict()
+
+
+@validate(schema.scheming_migration_mapping_delete)
+def scheming_migration_mapping_delete(context: Any, data_dict: dict[str, Any]) -> bool:
+    """Delete a stored field mapping.
+
+    :param schema_type: the schema being migrated
+    :type schema_type: string
+    :param from_version: the source version
+    :type from_version: int
+    :param to_version: the target version
+    :type to_version: int
+    :param entity_type: the entity this schema applies to (default: ``dataset``)
+    :type entity_type: string
+    """
+    tk.check_access("scheming_migration_mapping_delete", context, data_dict)
+
+    row = SchemaMigration.get(*_version_pair(data_dict))
+    if row is None:
+        raise tk.ObjectNotFound(tk._("Mapping not found"))
+
+    row.delete()
+
+    return True
+
+
+@validate(schema.scheming_migration_apply)
+def scheming_migration_apply(context: Any, data_dict: dict[str, Any]) -> dict[str, Any]:
+    """Move datasets from one schema version to another.
+
+    With ``id``, migrates that one dataset synchronously and returns the
+    finished run. Without it, queues a background run over every dataset still
+    pinned to ``from_version`` and returns it as ``pending``.
+
+    :param schema_type: the schema being migrated
+    :type schema_type: string
+    :param from_version: the version datasets are currently pinned to
+    :type from_version: int
+    :param to_version: the version they should move to
+    :type to_version: int
+    :param id: migrate only this dataset, synchronously
+    :type id: string
+    :param dry_run: validate without writing anything
+    :type dry_run: bool
+    :param values: with ``id``, answers to the mapping's open questions for
+        that dataset, as ``{"dataset_fields": {"<field>": value}}``
+    :type values: dict
+    :param entity_type: the entity this schema applies to (default: ``dataset``)
+    :type entity_type: string
+    """
+    tk.check_access("scheming_migration_apply", context, data_dict)
+
+    entity_type, schema_type, from_version, to_version = _version_pair(data_dict)
+    dry_run = data_dict.get("dry_run", False)
+
+    entity_id = data_dict.get("id")
+    values = data_dict.get("values") if entity_id else None
+
+    runner.refuse_while_running(entity_type, schema_type, from_version, to_version)
+    mapping = runner.ready_mapping(
+        entity_type, schema_type, from_version, to_version, values
+    )
+
+    if entity_id:
+        run = runner.run_single(
+            schema_type,
+            from_version,
+            to_version,
+            mapping,
+            context["user"],
+            entity_id,
+            dry_run,
+        )
+    else:
+        run = runner.enqueue(
+            schema_type,
+            from_version,
+            to_version,
+            mapping,
+            context["user"],
+            dry_run,
+        )
+
+    return run.as_dict()
+
+
+@validate(schema.scheming_migration_run_list)
+def scheming_migration_run_list(
+    context: Any, data_dict: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """List migration runs, newest first.
+
+    :param entity_type: the entity these schemas apply to (default: ``dataset``)
+    :type entity_type: string
+    :param schema_type: limit to one schema type
+    :type schema_type: string
+    :param limit: how many runs to return (default: 20)
+    :type limit: int
+    :param offset: how many runs to skip
+    :type offset: int
+    """
+    tk.check_access("scheming_migration_run_list", context, data_dict)
+
+    rows = MigrationRun.search(
+        data_dict["entity_type"],
+        data_dict.get("schema_type"),
+        data_dict["limit"],
+        data_dict["offset"],
+    )
+
+    return [row.as_dict() for row in rows]
+
+
+@validate(schema.scheming_migration_run_show)
+def scheming_migration_run_show(
+    context: Any, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Show one migration run together with its per-dataset results.
+
+    :param id: the run id
+    :type id: string
+    """
+    tk.check_access("scheming_migration_run_show", context, data_dict)
+
+    run = MigrationRun.get(data_dict["id"])
+    if run is None:
+        raise tk.ObjectNotFound(tk._("Migration run not found"))
+
+    return {
+        **run.as_dict(),
+        "items": [item.as_dict() for item in MigrationRunItem.for_run(run.id)],
+    }
+
+
+@validate(schema.scheming_migration_run_cancel)
+def scheming_migration_run_cancel(
+    context: Any, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Stop a queued or running migration after its current dataset.
+
+    :param id: the run id
+    :type id: string
+    """
+    tk.check_access("scheming_migration_run_cancel", context, data_dict)
+
+    run = MigrationRun.get(data_dict["id"])
+    if run is None:
+        raise tk.ObjectNotFound(tk._("Migration run not found"))
+
+    if not run.is_active:
+        raise tk.ValidationError({"run": [tk._("Run already {}").format(run.status)]})
+
+    run.cancel()
+
+    return run.as_dict()

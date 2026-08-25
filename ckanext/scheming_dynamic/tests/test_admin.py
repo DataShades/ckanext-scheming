@@ -704,7 +704,6 @@ class TestSchemaHistoryIndex:
         assert "No schema activity has been recorded yet." in resp.body
 
 
-
 class TestSchemaRestore:
     def _create(self, app, definition: dict) -> SchemingSchemaActivity:
         helpers.call_action(

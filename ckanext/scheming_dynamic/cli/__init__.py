@@ -17,6 +17,11 @@ from ckanext.scheming.plugins import (
     SchemingGroupsPlugin,
     SchemingOrganizationsPlugin,
 )
+from ckanext.scheming_dynamic.cli.cli_utils import (
+    entity_type_option,
+    site_user_context,
+)
+from ckanext.scheming_dynamic.cli.migration import migration
 from ckanext.scheming_dynamic.model import (
     SchemingSchemaPin,
     SchemingSchemaVersion,
@@ -24,20 +29,13 @@ from ckanext.scheming_dynamic.model import (
 from ckanext.scheming_dynamic.schema import SCHEMA_CLASSES
 from ckanext.scheming_dynamic.validator import error_location, iter_errors, load_data
 
-entity_type_option = click.option(
-    "-t",
-    "--type",
-    "entity_type",
-    type=click.Choice(sorted(SCHEMA_CLASSES)),
-    default="dataset",
-    show_default=True,
-    help="Which ckanext-scheming schema shape to build/validate against.",
-)
-
 
 @click.group(short_help="scheming_dynamic commands")
 def scheming_dynamic():
     """scheming_dynamic commands."""
+
+
+scheming_dynamic.add_command(migration)
 
 
 @scheming_dynamic.command()
@@ -109,7 +107,7 @@ def sync(ctx: click.Context, entity_type: str, schema_type: str):
         )
         ctx.exit(1)
 
-    context = _site_user_context()
+    context = site_user_context()
     head_version = SchemingSchemaVersion.head_version(entity_type, schema_type)
 
     try:
@@ -206,7 +204,7 @@ def pin(  # noqa: PLR0913
     """
     target_version = _get_target_version(ctx, entity_type, schema_type, version)
 
-    context = _site_user_context()
+    context = site_user_context()
     validator = Validator(entity_type, schema_type, context["user"])  # type: ignore
 
     pinned = failed = 0
@@ -241,8 +239,7 @@ def _get_target_version(
 
     if head == 0:
         click.secho(
-            f"No locked version for '{schema_type}' ({entity_type}) -- "
-            "`sync` first.",
+            f"No locked version for '{schema_type}' ({entity_type}) -- `sync` first.",
             fg="red",
         )
         ctx.exit(1)
@@ -299,13 +296,6 @@ def _static_schema(entity_type: str, schema_type: str) -> dict[str, Any] | None:
     # "Known limitations").
     static = instance._static_schemas if entity_type == "dataset" else instance._schemas
     return static.get(schema_type)
-
-
-def _site_user_context() -> types.Context:
-    return types.Context(
-        user=tk.get_action("get_site_user")({"ignore_auth": True}, {})["name"],
-        ignore_auth=True,
-    )
 
 
 def _unpinned_entities(
