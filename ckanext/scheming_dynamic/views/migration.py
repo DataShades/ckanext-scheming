@@ -305,6 +305,6 @@ bp.add_url_rule(
     methods=["POST"],
 )
 bp.add_url_rule(
-    "/<schema_type>/<int:from_version>/<int:to_version>/dataset/<id>",
+    "/<schema_type>/<int:from_version>/<int:to_version>/dataset/<pkg_id>",
     view_func=DatasetView.as_view("dataset"),
 )
