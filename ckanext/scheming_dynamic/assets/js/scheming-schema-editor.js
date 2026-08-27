@@ -281,12 +281,13 @@ ckan.module('scheming-schema-editor', function ($) {
 
       this.textarea.value = JSON.stringify(this.editor.getValue(), null, 2);
 
-      this.editor.validate();
       var errors = this.editor.getErrors();
+
       if (errors.length) {
         this._showErrors(errors.map(function (error) {
-          var path = error.path.replace(/^root\.?/, '') || 'schema';
-          return path + ': ' + error.message;
+          var path = (error.path || '').replace(/^#\/?/, '') || 'schema';
+          var messages = error.messages || [error.message];
+          return path + ': ' + messages.join('; ');
         }));
         return false;
       }
