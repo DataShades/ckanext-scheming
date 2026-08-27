@@ -570,6 +570,39 @@ markdown text area and display
 You may define your own presets by adding additional files to the `scheming.presets`
 [configuration setting](#configuration).
 
+#### Restricting where a preset may be used
+
+Some presets only make sense on one particular field, or depend on other
+keys being present on the field. A preset may declare these constraints in
+its `values`. They are checked when schemas are expanded at startup, and a
+violation raises a `SchemingException` (so the schema fails fast rather than
+rendering a broken form).
+
+```yaml
+  restrict_to_field: {entity_type: dataset, field_name: title}
+```
+
+The preset may only be applied to the field named `field_name` on a schema
+for the given `entity_type` (`dataset`, `resource`, `group` or
+`organization`). Applying it to any other field raises an error. This is
+used by the core presets that wrap CKAN's built-in fields, for example
+`dataset_slug` (dataset `name`), `dataset_organization` (dataset
+`owner_org`), `resource_url_upload` (resource `url`) and
+`organization_url_upload` (organization `image_url`).
+
+```yaml
+  requires_one_of: [choices, choices_helper]
+```
+
+The field using this preset must set at least one of the listed keys.
+Applied to a field that sets none of them raises an error. The core
+choice-based presets (`select`, `radio`, `multiple_checkbox`,
+`multiple_select`) use this to require that a field supplies
+[`choices`](#choices) or a [`choices_helper`](#choices_helper).
+
+Both keys are optional; a preset without them can be used anywhere, as
+before.
+
 
 ### `form_snippet`
 
