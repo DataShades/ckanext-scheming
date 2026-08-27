@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from contextlib import nullcontext
-from typing import Any, cast
+from typing import Any
 
 from click import get_current_context
 from flask import has_app_context
@@ -91,7 +91,9 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
     schema_type = data_dict["schema_type"]
     definition = data_dict["definition"]
 
-    if not SchemingSchemaVersion.head_version(entity_type, schema_type):
+    head = SchemingSchemaVersion.head(entity_type, schema_type)
+
+    if not head:
         raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
     type_field = schema.TYPE_FIELDS[entity_type]
@@ -106,7 +108,7 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
 
     _check_schema_renders(schema_type, definition)
 
-    row = _lock_or_sync_version(entity_type, schema_type, definition)
+    row = _lock_or_sync_version(entity_type, schema_type, definition, head)
 
     SchemingSchemaActivity.record(
         entity_type,
@@ -123,28 +125,29 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
 
 
 def _lock_or_sync_version(
-    entity_type: str, schema_type: str, definition: dict[str, Any]
+    entity_type: str,
+    schema_type: str,
+    definition: dict[str, Any],
+    head: SchemingSchemaVersion,
 ) -> SchemingSchemaVersion:
     """Apply an edit to the schema's current (head) version.
 
-    If the head version is already pinned by an entity, it can't be changed
-    -- so this locks ``definition`` as a new version instead. Otherwise
-    nothing depends on the head version yet, so it's safe to overwrite its
-    definition directly.
+    If ``definition`` is unchanged from the head, returns it as-is --
+    otherwise, if the head version is already pinned by an entity, it can't
+    be changed, so this locks ``definition`` as a new version instead.
+    Otherwise nothing depends on the head version yet, so it's safe to
+    overwrite its definition directly.
 
     Returns the version row that now holds ``definition``.
     """
-    head_version = SchemingSchemaVersion.head_version(entity_type, schema_type)
+    if head.definition == definition:
+        return head
 
-    if SchemingSchemaPin.is_version_locked(entity_type, schema_type, head_version):
+    if SchemingSchemaPin.is_version_locked(entity_type, schema_type, head.version):
         return SchemingSchemaVersion.lock(entity_type, schema_type, definition)
 
-    existing = cast(
-        SchemingSchemaVersion,
-        SchemingSchemaVersion.get(entity_type, schema_type, head_version),
-    )
-    existing.definition = definition
-    return existing
+    head.definition = definition
+    return head
 
 
 @validate(schema.scheming_schema_delete)

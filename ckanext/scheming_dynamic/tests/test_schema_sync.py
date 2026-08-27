@@ -132,7 +132,7 @@ class TestDynamicSchemaSync:
     def test_presets_are_expanded(self, schema_definition):
         definition = {
             **schema_definition,
-            "dataset_fields": [{"field_name": "x", "preset": "title"}],
+            "dataset_fields": [{"field_name": "title", "preset": "title"}],
         }
 
         helpers.call_action(

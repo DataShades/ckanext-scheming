@@ -878,7 +878,7 @@ class TestSchemaPreview:
     def test_preview_expands_presets(self, app, schema_definition):
         definition = {
             **schema_definition,
-            "dataset_fields": [{"field_name": "custom_title", "preset": "title"}],
+            "dataset_fields": [{"field_name": "title", "preset": "title"}],
         }
 
         resp = app.post(
@@ -888,7 +888,7 @@ class TestSchemaPreview:
         )
 
         assert resp.status_code == STATUS_OK
-        assert 'name="custom_title"' in resp.body
+        assert 'name="title"' in resp.body
 
     def test_missing_field_name_is_reported(self, app, schema_definition):
         definition = {**schema_definition, "dataset_fields": [{"label": "No name"}]}

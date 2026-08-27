@@ -5,7 +5,11 @@ import pytest
 import ckan.plugins.toolkit as tk
 from ckan.tests import factories, helpers
 
-from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
+from ckanext.scheming_dynamic.model import (
+    SchemingPreset,
+    SchemingSchemaActivity,
+    SchemingSchemaVersion,
+)
 from ckanext.scheming_dynamic.tests import factories as scheming_factories
 
 
@@ -146,6 +150,48 @@ class TestSchemingSchemaUpdate:
         row = SchemingSchemaVersion.head("dataset", "test-type")
         assert row
         assert row.definition == updated
+
+    def test_update_with_unchanged_definition_is_a_noop(self, schema_definition):
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
+
+        result = helpers.call_action(
+            "scheming_schema_update",
+            schema_type="test-type",
+            definition=schema_definition,
+        )
+
+        assert result["version"] == 1
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 1
+
+    def test_update_with_unchanged_definition_still_logs_activity(
+        self, schema_definition
+    ):
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
+        before = SchemingSchemaActivity.count_history("dataset", "test-type")
+
+        helpers.call_action(
+            "scheming_schema_update",
+            schema_type="test-type",
+            definition=schema_definition,
+        )
+
+        after = SchemingSchemaActivity.count_history("dataset", "test-type")
+        assert after == before + 1
+
+    def test_update_with_unchanged_definition_does_not_fork_pinned_version(
+        self, schema_definition
+    ):
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
+        factories.Dataset(type="test-type")  # locks/pins version 1
+
+        result = helpers.call_action(
+            "scheming_schema_update",
+            schema_type="test-type",
+            definition=schema_definition,
+        )
+
+        assert result["version"] == 1
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 1
 
     def test_update_missing_schema_is_rejected(self, schema_definition):
         with pytest.raises(tk.ValidationError):
