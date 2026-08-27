@@ -739,23 +739,59 @@ def _field_create_validators(f, schema, convert_extras):
     return validators
 
 
-def _expand(schema, field):
+def _check_preset_restrictions(preset, preset_values, field, entity_type):
+    """
+    Some core presets only make sense on a specific field, or require
+    other keys (like choices) to be set on the field. Enforce the
+    restrictions declared on the preset in presets.json.
+
+    raises SchemingException if field violates a restriction.
+    """
+    restrict_to_field = preset_values.get('restrict_to_field')
+    if restrict_to_field and (
+        entity_type != restrict_to_field.get('entity_type')
+        or field.get('field_name') != restrict_to_field.get('field_name')
+    ):
+        raise SchemingException(
+            "preset '{}' may only be used for the {} field '{}', not "
+            "the {} field '{}'".format(
+                preset,
+                restrict_to_field.get('entity_type'),
+                restrict_to_field.get('field_name'),
+                entity_type,
+                field.get('field_name'),
+            )
+        )
+
+    requires_one_of = preset_values.get('requires_one_of')
+    if requires_one_of and not any(key in field for key in requires_one_of):
+        raise SchemingException(
+            "preset '{}' requires one of {} to be set on field '{}'".format(
+                preset, requires_one_of, field.get('field_name')
+            )
+        )
+
+
+def _expand(schema, field, entity_type):
     """
     If scheming field f includes a preset value return a new field
     based on the preset with values from f overriding any values in the
     preset.
 
-    raises SchemingException if the preset given is not found.
+    raises SchemingException if the preset given is not found, or if the
+    field violates a restriction declared on the preset.
     """
     preset = field.get('preset')
     if preset:
         if preset not in _SchemingMixin._presets:
             raise SchemingException('preset \'{}\' not defined'.format(preset))
-        field = dict(_SchemingMixin._presets[preset], **field)
+        preset_values = _SchemingMixin._presets[preset]
+        field = dict(preset_values, **field)
+        _check_preset_restrictions(preset, preset_values, field, entity_type)
 
     if 'repeating_subfields' in field:
         field['repeating_subfields'] = [
-            _expand(schema, subfield)
+            _expand(schema, subfield, entity_type)
             for subfield in field['repeating_subfields']
         ]
     return field
@@ -772,22 +808,40 @@ def _expand_schemas(schemas):
             if grouping not in schema:
                 continue
 
+            entity_type = _entity_type_for_grouping(schema, grouping)
+
             schema[grouping] = [
-                _expand(schema, field)
+                _expand(schema, field, entity_type)
                 for field in schema[grouping]
             ]
 
             for field in schema[grouping]:
                 if 'repeating_subfields' in field:
                     field['repeating_subfields'] = [
-                        _expand(schema, subfield)
+                        _expand(schema, subfield, entity_type)
                         for subfield in field['repeating_subfields']
                     ]
                 elif 'simple_subfields' in field:
                     field['simple_subfields'] = [
-                        _expand(schema, subfield)
+                        _expand(schema, subfield, entity_type)
                         for subfield in field['simple_subfields']
                     ]
 
         out[name] = schema
     return out
+
+def _entity_type_for_grouping(schema, grouping):
+    """
+    The kind of thing (dataset, resource, group, organization) that fields
+    in this grouping of this schema describe, used to check preset
+    restrictions.
+    """
+    if grouping == 'dataset_fields':
+        return 'dataset'
+    if grouping == 'resource_fields':
+        return 'resource'
+    if 'organization_type' in schema:
+        return 'organization'
+    if 'group_type' in schema:
+        return 'group'
+    return None
