@@ -23,6 +23,7 @@ ckan.module('scheming-schema-editor', function ($) {
       this.lang = this.supportedLanguages.includes(this.options.lang) ? this.options.lang : "en";
       this.textarea = this.el.get(0);
       this.form = this.textarea.form;
+      this.presets = this._loadPresets();
       this.metaSchema = JSON.parse(
         document.getElementById('scheming-meta-schema').dataset.schema
       );
@@ -45,6 +46,9 @@ ckan.module('scheming-schema-editor', function ($) {
       var self = this;
       this._createEditor(startval).then(function () {
         self._setFormMode(true);
+        self.editor.on('change', self._onEditorChange);
+        self.editor.on('instance-change', self._onInstanceChange);
+        self._onEditorChange();
 
         self.form.addEventListener('submit', self._onSubmit);
         self.toggle.addEventListener('click', self._onToggle);
@@ -58,20 +62,24 @@ ckan.module('scheming-schema-editor', function ($) {
     },
 
     _buildLayout: function () {
-      this.toolbar = document.createElement('div');
-      this.toolbar.className = 'scheming-schema-editor-toolbar d-flex gap-2 py-2 mb-2';
+      this.toolbar = Object.assign(document.createElement('div'), {
+        className: 'scheming-schema-editor-toolbar d-flex gap-2 py-2 mb-2'
+      });
 
-      this.toggle = document.createElement('button');
-      this.toggle.type = 'button';
-      this.toggle.className = 'btn btn-secondary btn-sm';
+      this.toggle = Object.assign(document.createElement('button'), {
+        type: 'button',
+        className: 'btn btn-secondary btn-sm'
+      });
       this.toolbar.appendChild(this.toggle);
 
-      this.errorBox = document.createElement('div');
-      this.errorBox.className = 'alert alert-danger scheming-schema-editor-errors';
-      this.errorBox.hidden = true;
+      this.errorBox = Object.assign(document.createElement('div'), {
+        className: 'alert alert-danger scheming-schema-editor-errors',
+        hidden: true
+      });
 
-      this.editorHolder = document.createElement('div');
-      this.editorHolder.className = 'scheming-schema-editor-form';
+      this.editorHolder = Object.assign(document.createElement('div'), {
+        className: 'scheming-schema-editor-form'
+      });
 
       var parent = this.textarea.parentNode;
       parent.insertBefore(this.toolbar, this.textarea);
@@ -88,28 +96,32 @@ ckan.module('scheming-schema-editor', function ($) {
      * inputs it contains are never submitted with the schema form.
      */
     _buildPreviewLayout: function () {
-      this.previewButton = document.createElement('button');
-      this.previewButton.type = 'button';
-      this.previewButton.className = 'btn btn-secondary btn-sm';
-      this.previewButton.textContent = this.options.previewKind === 'preset'
-        ? this._('Preview preset')
-        : this._('Preview form');
+      this.previewButton = Object.assign(document.createElement('button'), {
+        type: 'button',
+        className: 'btn btn-secondary btn-sm',
+        textContent: this.options.previewKind === 'preset'
+          ? this._('Preview preset')
+          : this._('Preview form')
+      });
       this.toolbar.appendChild(this.previewButton);
 
-      this.previewToolbar = document.createElement('div');
-      this.previewToolbar.className = 'scheming-schema-editor-toolbar py-2';
+      this.previewToolbar = Object.assign(document.createElement('div'), {
+        className: 'scheming-schema-editor-toolbar py-2'
+      });
 
-      this.previewClose = document.createElement('button');
-      this.previewClose.type = 'button';
-      this.previewClose.className = 'btn btn-secondary btn-sm';
-      this.previewClose.textContent = this._('Back to editing');
+      this.previewClose = Object.assign(document.createElement('button'), {
+        type: 'button',
+        className: 'btn btn-secondary btn-sm',
+        textContent: this._('Back to editing')
+      });
       this.previewToolbar.appendChild(this.previewClose);
 
       this.previewContent = document.createElement('div');
 
-      this.previewPane = document.createElement('div');
-      this.previewPane.className = 'scheming-schema-preview';
-      this.previewPane.hidden = true;
+      this.previewPane = Object.assign(document.createElement('div'), {
+        className: 'scheming-schema-preview',
+        hidden: true
+      });
       this.previewPane.appendChild(this.previewToolbar);
       this.previewPane.appendChild(this.previewContent);
 
@@ -204,6 +216,7 @@ ckan.module('scheming-schema-editor', function ($) {
       }
       this.editor.setValue(parsed);
       this._setFormMode(true);
+      this._onEditorChange();
     },
 
     _onTextareaInput: function () {
@@ -392,6 +405,194 @@ ckan.module('scheming-schema-editor', function ($) {
     _clearErrors: function () {
       this.errorBox.hidden = true;
       this.errorBox.innerHTML = '';
+    },
+
+    _loadPresets: function () {
+      var el = document.getElementById('scheming-presets');
+      if (!el) {
+        return {};
+      }
+      try {
+        return JSON.parse(el.dataset.presets || '{}');
+      } catch (err) {
+        return {};
+      }
+    },
+
+    /**
+     * Debounced full rescan: safety net for structural changes (array
+     * item add/delete/move, initial load, JSON-mode round trip) where
+     * a single instance's path doesn't tell the whole story.
+     */
+    _onEditorChange: function (e) {
+      clearTimeout(this._presetHintsTimer);
+      var self = this;
+
+      console.log(e);
+      this._presetHintsTimer = setTimeout(function () {
+        self._updatePresetHints();
+      }, 150);
+    },
+
+    /**
+     * Targeted update fired on every 'instance-change'. Object instances
+     * re-emit this event for themselves after any child changes,
+     * so this fires with the field object's own path both when its
+     * preset changes AND when one of its sibling properties (form_snippet,
+     * etc.) is edited.
+     *
+     * No-op for every other path since no ".preset" node exists there.
+     */
+    _onInstanceChange: function (instance) {
+      if (!instance || !instance.path) {
+        return;
+      }
+
+      var self = this;
+      var presetPath = instance.path + '/preset';
+
+      queueMicrotask(function () {
+        var presetNode = self.editorHolder.querySelector('[data-path="' + presetPath + '"]');
+        if (presetNode) {
+          self._renderPresetHint(presetNode);
+        }
+      });
+    },
+
+    _updatePresetHints: function () {
+      var self = this;
+      this.editorHolder.querySelectorAll('[data-path$="/preset"]').forEach(function (node) {
+        self._renderPresetHint(node);
+      });
+    },
+
+    /**
+     * For a given "preset" field's container, show what each value the
+     * selected preset would provide, and whether the field's own value
+     * (set alongside the preset) is overriding it.
+     */
+    _renderPresetHint: function (presetNode) {
+      var path = presetNode.getAttribute('data-path');
+      var fieldPath = path.slice(0, -'/preset'.length);
+
+      var presetInstance = this.editor.getInstance(path);
+      var presetName = presetInstance ? presetInstance.getValue() : null;
+      var presetValues = presetName && this.presets ? this.presets[presetName] : null;
+
+      var hints = presetNode.querySelector('.scheming-preset-hints');
+
+      if (!presetValues) {
+        if (hints) {
+          hints.remove();
+        }
+        return;
+      }
+
+      if (!hints) {
+        hints = document.createElement('div');
+        hints.className = 'scheming-preset-hints';
+        presetNode.appendChild(hints);
+      }
+
+      hints.innerHTML = '';
+
+      const hintsHeader = document.createElement('h4');
+      hintsHeader.className = 'scheming-preset-hints-header open m-0';
+
+      const hintsToggle = Object.assign(document.createElement('button'), {
+        type: 'button',
+        className: 'btn btn-link bnt-sm p-0',
+        textContent: ckan.i18n._('Preset attributes:')
+      });
+
+      const hintsContent = document.createElement('div');
+      hintsContent.className = 'collapse show';
+
+      hintsHeader.appendChild(hintsToggle);
+      hints.appendChild(hintsHeader);
+      hints.appendChild(hintsContent);
+
+      var collapse = new bootstrap.Collapse(hintsContent, {
+        toggle: false
+      });
+
+      hintsToggle.addEventListener('click', function (e) {
+        collapse.toggle();
+        e.currentTarget.parentElement.classList.toggle('open');
+      });
+
+      var self = this;
+      Object.keys(presetValues).sort().forEach(function (key) {
+        hintsContent.appendChild(
+          self._buildPresetHintRow(fieldPath, key, presetValues[key])
+        );
+      });
+    },
+
+    _buildPresetHintRow: function (fieldPath, key, presetValue) {
+      var siblingPath = fieldPath + '/' + key;
+
+      // DOM presence, not instance.isActive/getValue(): oneOf-wrapped
+      // properties overwrite the wrapper's jedison.instances entry with
+      // their branch instance, whose value survives deactivate().
+      var siblingNode = this.editorHolder.querySelector('[data-path="' + siblingPath + '"]');
+      var siblingInstance = siblingNode ? this.editor.getInstance(siblingPath) : null;
+      var overridden = !!(siblingInstance && this._hasValue(siblingInstance.getValue()));
+
+      var row = document.createElement('div');
+      row.className = 'scheming-preset-hint';
+
+      const label = Object.assign(document.createElement('span'), {
+        className: 'scheming-preset-hint-key',
+        textContent: key + ': '
+      });
+      row.appendChild(label);
+
+      if (overridden) {
+        row.classList.add('scheming-preset-hint-is-overridden');
+
+        const was = Object.assign(document.createElement('del'), {
+          className: 'scheming-preset-hint-value',
+          textContent: this._formatPresetValue(presetValue)
+        });
+
+        row.appendChild(was);
+
+        const now = Object.assign(document.createElement('span'), {
+          className: 'scheming-preset-hint-current',
+          textContent: ' ' + this._formatPresetValue(siblingInstance.getValue())
+        });
+
+        row.appendChild(now);
+      } else {
+        const value = Object.assign(document.createElement('span'), {
+          className: 'scheming-preset-hint-value scheming-preset-hint-inherited',
+          textContent: this._formatPresetValue(presetValue)
+        });
+        row.appendChild(value);
+      }
+
+      return row;
+    },
+
+    _hasValue: function (value) {
+      if (value === undefined || value === null || value === '') {
+        return false;
+      }
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      if (typeof value === 'object') {
+        return Object.keys(value).length > 0;
+      }
+      return true;
+    },
+
+    _formatPresetValue: function (value) {
+      if (value === null || value === undefined || typeof value === 'string') {
+        return String(value);
+      }
+      return JSON.stringify(value);
     }
   };
 });

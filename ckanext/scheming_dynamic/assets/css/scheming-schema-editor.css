@@ -109,6 +109,58 @@
 #scheming-preset-form .jedi-btn:disabled {
   border: unset;
 }
+#scheming-schema-form .scheming-preset-hints,
+#scheming-preset-form .scheming-preset-hints {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--bs-border-color);
+  font-size: 0.875rem;
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hints-header,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hints-header {
+  color: var(--bs-secondary-color);
+  position: relative;
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hints-header .btn,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hints-header .btn {
+  color: var(--bs-secondary-color);
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hints-header::after,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hints-header::after {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  position: absolute;
+  right: 10px;
+  top: 12px;
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hints-header.open::after,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hints-header.open::after {
+  transform: rotate(-135deg);
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hint,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hint {
+  color: var(--bs-secondary-color);
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hint .scheming-preset-hint-key,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hint .scheming-preset-hint-key {
+  font-weight: 600;
+}
+#scheming-schema-form .scheming-preset-hints .scheming-preset-hint .scheming-preset-hint-value,
+#scheming-preset-form .scheming-preset-hints .scheming-preset-hint .scheming-preset-hint-value {
+  color: var(--bs-secondary-color);
+}
+#scheming-schema-form .scheming-preset-hint-is-overridden .scheming-preset-hint-current,
+#scheming-preset-form .scheming-preset-hint-is-overridden .scheming-preset-hint-current {
+  color: var(--bs-body-color);
+  font-weight: 600;
+}
 
 .scheming-history-diff .diff-add {
   color: black;

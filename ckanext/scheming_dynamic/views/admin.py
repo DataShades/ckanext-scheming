@@ -77,6 +77,7 @@ class CreateView(MethodView):
                 "errors": errors or {},
                 "error_summary": error_summary or {},
                 "meta_schema": _meta_schema(),
+                "presets": tk.h.scheming_get_presets() or {},
                 "is_new": True,
             },
         )
@@ -122,6 +123,7 @@ class EditView(MethodView):
                 "errors": errors or {},
                 "error_summary": error_summary or {},
                 "meta_schema": _meta_schema(),
+                "presets": tk.h.scheming_get_presets() or {},
                 "is_new": False,
                 "schema_type": schema_type,
             },

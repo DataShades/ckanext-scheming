@@ -115,6 +115,58 @@
     .jedi-btn:disabled {
         border: unset;
     }
+
+    .scheming-preset-hints {
+        margin-top: .5rem;
+        padding: .5rem .75rem;
+        border-left: 3px solid var(--bs-border-color);
+        font-size: .875rem;
+
+        .scheming-preset-hints-header {
+            color: var(--bs-secondary-color);
+            position: relative;
+
+            .btn {
+                color: var(--bs-secondary-color);
+            }
+
+            &::after {
+                content: '';
+                display: inline-block;
+                width: 0.5rem;
+                height: 0.5rem;
+                margin-left: 0.5rem;
+                border-right: 2px solid currentColor;
+                border-bottom: 2px solid currentColor;
+                transform: rotate(45deg);
+                transition: transform 0.2s ease;
+                position: absolute;
+                right: 10px;
+                top: 12px;
+            }
+
+            &.open::after {
+                transform: rotate(-135deg);
+            }
+        }
+
+        .scheming-preset-hint {
+            color: var(--bs-secondary-color);
+
+            .scheming-preset-hint-key {
+                font-weight: 600;
+            }
+
+            .scheming-preset-hint-value {
+                color: var(--bs-secondary-color);
+            }
+        }
+    }
+
+    .scheming-preset-hint-is-overridden .scheming-preset-hint-current {
+        color: var(--bs-body-color);
+        font-weight: 600;
+    }
 }
 
 .scheming-history-diff .diff-add { color: black; background: #ddf4ff; }
