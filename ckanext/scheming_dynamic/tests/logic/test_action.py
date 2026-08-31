@@ -91,6 +91,39 @@ class TestSchemingSchemaCreate:
             err.value.error_dict["definition"]
         )
 
+    def test_dataset_type_matching_static_prefix_is_rejected(
+        self, app, tmp_path, schema_definition
+    ):
+        public = tmp_path / "public"
+        (public / "assets").mkdir(parents=True)
+
+        static_folders = app.flask_app.static_folder
+        app.flask_app.static_folder = [str(public), *static_folders]
+        definition = {**schema_definition, "dataset_type": "assets"}
+
+        try:
+            with pytest.raises(tk.ValidationError) as err:
+                helpers.call_action("scheming_schema_create", definition=definition)
+        finally:
+            app.flask_app.static_folder = static_folders
+
+        assert "conflicts with the static URL prefix" in str(
+            err.value.error_dict["definition"]
+        )
+
+    @pytest.mark.parametrize("dataset_type", ["organization", "home"])
+    def test_dataset_type_matching_registered_ckan_name_is_rejected(
+        self, dataset_type, schema_definition
+    ):
+        definition = {**schema_definition, "dataset_type": dataset_type}
+
+        with pytest.raises(tk.ValidationError) as err:
+            helpers.call_action("scheming_schema_create", definition=definition)
+
+        assert "conflicts with a registered CKAN route" in str(
+            err.value.error_dict["definition"]
+        )
+
     def test_empty_definition_is_rejected(self):
         with pytest.raises(tk.ValidationError) as err:
             helpers.call_action("scheming_schema_create", definition={})

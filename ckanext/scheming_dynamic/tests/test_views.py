@@ -25,6 +25,23 @@ class TestDynamicTypeRoutes:
     def test_unknown_type_is_not_found(self, app):
         app.get("/no-such-type/new", status=404)
 
+    def test_static_file_is_served(self, app, tmp_path):
+        public = tmp_path / "public"
+        logo = public / "images" / "logo.png"
+        logo.parent.mkdir(parents=True)
+        logo.write_bytes(b"logo")
+
+        static_folders = app.flask_app.static_folder
+        app.flask_app.static_folder = [str(public), *static_folders]
+
+        try:
+            response = app.get("/images/logo.png")
+        finally:
+            app.flask_app.static_folder = static_folders
+
+        assert response.status_code == STATUS_OK
+        assert response.bytes == b"logo"
+
     def test_dynamic_type_new_form_renders(
         self, app, schema_definition, test_request_context
     ):
