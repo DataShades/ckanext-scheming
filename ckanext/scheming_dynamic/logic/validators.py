@@ -1,11 +1,14 @@
 import logging
+from pathlib import Path
 from typing import Any
+
+from flask import current_app, has_app_context
 
 import ckan.plugins.toolkit as tk
 from ckan import model, types
 from ckan.lib.navl.dictization_functions import missing
 
-from ckanext.scheming.plugins import _expand_schemas
+from ckanext.scheming.plugins import SchemingDatasetsPlugin, _expand_schemas
 from ckanext.scheming_dynamic import sync
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE, TYPE_FIELDS
 from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
@@ -58,10 +61,45 @@ def scheming_definition_valid(
     if definition[type_field].endswith("_resource"):
         raise tk.Invalid(tk._(f"'{type_field}' must not end with '_resource'."))
 
+    if _static_url_prefix_exists(definition[type_field]):
+        raise tk.Invalid(tk._(f"'{type_field}' conflicts with the static URL prefix '{definition[type_field]}'."))
+
+    if _registered_ckan_name_exists(definition[type_field]):
+        raise tk.Invalid(
+            tk._(
+                f"'{type_field}' conflicts with a registered CKAN route or blueprint named '{definition[type_field]}'."
+            )
+        )
+
     try:
         _expand_schemas({definition["dataset_type"]: definition})
     except Exception as e:
         raise tk.Invalid(tk._("Schema cannot be expanded: {}").format(e)) from e
+
+
+def _static_url_prefix_exists(prefix: str) -> bool:
+    if not has_app_context():
+        return False
+
+    static_folders = current_app.static_folder or []
+    if isinstance(static_folders, str):
+        static_folders = [static_folders]
+
+    return any((Path(folder) / prefix).exists() for folder in static_folders)
+
+
+def _registered_ckan_name_exists(name: str) -> bool:
+    if not has_app_context():
+        return False
+
+    plugin = SchemingDatasetsPlugin.instance
+    if name == "dataset" or (plugin is not None and name in plugin._schemas_value):
+        return False
+
+    if name in current_app.blueprints:
+        return True
+
+    return any(rule.rule.lstrip("/").partition("/")[0] == name for rule in current_app.url_map.iter_rules())
 
 
 def scheming_schema_exists(
@@ -91,19 +129,9 @@ def scheming_schema_not_in_use(
     """
     schema_type = data[key]
 
-    in_use = (
-        model.Session.query(model.Package.id)
-        .filter(model.Package.type == schema_type)
-        .first()
-        is not None
-    )
+    in_use = model.Session.query(model.Package.id).filter(model.Package.type == schema_type).first() is not None
     if in_use:
-        raise tk.Invalid(
-            tk._(
-                f"Cannot delete schema '{schema_type}': datasets of this "
-                "type still exist."
-            )
-        )
+        raise tk.Invalid(tk._(f"Cannot delete schema '{schema_type}': datasets of this type still exist."))
 
 
 def scheming_preset_definition_valid(
@@ -131,15 +159,9 @@ def scheming_preset_definition_valid(
     try:
         resolve_preset_values(preset_name, raw, sync.get_static_presets())
     except PresetCycleError as e:
-        raise tk.Invalid(
-            tk._("Preset cycle detected: {}").format(
-                " -> ".join([*e.chain, e.chain[0]])
-            )
-        ) from e
+        raise tk.Invalid(tk._("Preset cycle detected: {}").format(" -> ".join([*e.chain, e.chain[0]]))) from e
     except PresetBaseNotFoundError as e:
-        raise tk.Invalid(
-            tk._(f"Base preset '{e.base}' is not a registered or existing preset")
-        ) from e
+        raise tk.Invalid(tk._(f"Base preset '{e.base}' is not a registered or existing preset")) from e
 
 
 def scheming_preset_exists(
@@ -194,10 +216,7 @@ def scheming_preset_not_in_use(
                 continue
 
             raise tk.Invalid(
-                tk._(
-                    f"Cannot delete preset '{preset_name}': still used by "
-                    f"the '{row.schema_type}' schema."
-                )
+                tk._(f"Cannot delete preset '{preset_name}': still used by the '{row.schema_type}' schema.")
             )
 
 
@@ -225,10 +244,7 @@ def _definition_uses_any_preset(definition: dict[str, Any], names: set[str]) -> 
 def _field_uses_any_preset(field: dict[str, Any], names: set[str]) -> bool:
     if field.get("preset") in names:
         return True
-    return any(
-        _field_uses_any_preset(sub, names)
-        for sub in field.get("repeating_subfields", [])
-    )
+    return any(_field_uses_any_preset(sub, names) for sub in field.get("repeating_subfields", []))
 
 
 def scheming_migration_versions_valid(
@@ -251,9 +267,7 @@ def scheming_migration_versions_valid(
 
     for version in (from_version, to_version):
         if SchemingSchemaVersion.get(entity_type, schema_type, version) is None:
-            raise tk.Invalid(
-                tk._(f"Version {version} of '{schema_type}' does not exist.")
-            )
+            raise tk.Invalid(tk._(f"Version {version} of '{schema_type}' does not exist."))
 
 
 def scheming_migration_mapping_valid(

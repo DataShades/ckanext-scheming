@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import click
 
+import ckan.plugins as p
 import ckan.plugins.toolkit as tk
 from ckan import model, types
 from ckan.lib import plugins as lib_plugins
@@ -284,9 +285,10 @@ def _static_schema(entity_type: str, schema_type: str) -> dict[str, Any] | None:
         "organization": SchemingOrganizationsPlugin,
     }[entity_type]
 
+    plugin_name = f"scheming_{entity_type}s"
     instance = plugin_class.instance
 
-    if instance is None:
+    if not p.plugin_loaded(plugin_name) or instance is None:
         raise click.ClickException(
             f"No scheming plugin for '{entity_type}' entities is loaded"
         )
