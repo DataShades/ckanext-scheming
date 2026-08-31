@@ -8,7 +8,7 @@ import ckan.plugins.toolkit as tk
 from ckan import model, types
 from ckan.lib.navl.dictization_functions import missing
 
-from ckanext.scheming.plugins import _expand_schemas
+from ckanext.scheming.plugins import SchemingDatasetsPlugin, _expand_schemas
 from ckanext.scheming_dynamic import sync
 from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE, TYPE_FIELDS
 from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
@@ -92,7 +92,8 @@ def _registered_ckan_name_exists(name: str) -> bool:
     if not has_app_context():
         return False
 
-    if name == "dataset" or tk.h.scheming_get_dataset_schema(name):
+    plugin = SchemingDatasetsPlugin.instance
+    if name == "dataset" or (plugin is not None and name in plugin._schemas_value):
         return False
 
     if name in current_app.blueprints:
