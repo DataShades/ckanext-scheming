@@ -14,6 +14,8 @@
 {% endblock primary %}
 
 {% block primary_content_inner %}
+  {% set entity_type = run.entity_type or 'dataset' %}
+  {% set route_args = {} if entity_type == 'dataset' else {'entity_type': entity_type} %}
   {% snippet 'scheming_dynamic/snippets/tabs.html', active_tab=active_tab %}
 
   <h2>
@@ -72,7 +74,7 @@
                   {% endfor %}
                 </ul>
                 <a class="btn btn-secondary btn-sm mt-1"
-                    href="{% url_for 'scheming_dynamic_migration.dataset', schema_type=run.schema_type, from_version=run.from_version, to_version=run.to_version, pkg_id=item.entity_id %}">
+                    href="{{ h.url_for('scheming_dynamic_migration.dataset', schema_type=run.schema_type, from_version=run.from_version, to_version=run.to_version, pkg_id=item.entity_id, **route_args) }}">
                   {{ _('Fix by hand') }}
                 </a>
               {% elif item.changes %}
@@ -97,7 +99,7 @@
   {% endif %}
 
   <div class="form-actions">
-    <a class="btn btn-secondary" href="{% url_for 'scheming_dynamic_migration.runs' %}">
+    <a class="btn btn-secondary" href="{{ h.url_for('scheming_dynamic_migration.runs') }}">
       {{ _('All runs') }}
     </a>
   </div>

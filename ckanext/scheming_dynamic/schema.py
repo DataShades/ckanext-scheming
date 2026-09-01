@@ -9,6 +9,7 @@ import ckan.plugins.toolkit as tk
 import ckanext.scheming
 from ckanext.scheming.plugins import _SchemingMixin
 from ckanext.scheming_dynamic import sync
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
 
 
 class BaseSchema:
@@ -366,46 +367,66 @@ class DatasetSchema(BaseSchema):
         }
 
 
-class GroupSchema(BaseSchema):
-    schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/group_schema.schema.json"
-    title = "ckanext-scheming group schema"
-    description = "Structural schema for a ckanext-scheming group schema definition"
+class _GroupOrgSchema(BaseSchema):
+    """Shared shape for group and organization schemas.
+
+    Groups and organizations have a single flat ``fields`` list and no
+    resource sub-form, so — unlike datasets — they get no form-page splitting
+    (``start_form_page`` is dropped from the field shape here).
+    """
+
+    type_field: str
+    type_title: str
 
     def required(self) -> list[str]:
-        return super().required() + ["group_type", "fields"]
+        # ``about`` is optional for group/organization schemas -- existing
+        # file-defined schemas (e.g. group_with_bookface.json) don't set it
+        return [self.type_field, "fields"]
 
     def properties(self) -> dict[str, Any]:
         return {
             **super().properties(),
-            "group_type": {
+            self.type_field: {
                 "type": "string",
-                "title": tk._("Group type"),
+                "title": self.type_title,
                 "minLength": 1,
+                "pattern": "^[A-Za-z0-9_\\-]+$",
             },
             "fields": {**self.FIELD_LIST, "title": tk._("Fields")},
         }
 
+    def defs(self) -> dict[str, Any]:
+        built = super().defs()
+        field = {**built["field"]}
+        field["properties"] = {
+            k: v
+            for k, v in field.get("properties", {}).items()
+            if k != "start_form_page"
+        }
+        field.pop("start_form_page", None)
+        built["field"] = field
+        built.pop("start_form_page", None)
+        return built
 
-class OrganizationSchema(BaseSchema):
+
+class GroupSchema(_GroupOrgSchema):
+    schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/group_schema.schema.json"
+    title = "ckanext-scheming group schema"
+    description = "Structural schema for a ckanext-scheming group schema definition"
+
+    type_field = "group_type"
+    type_title = tk._("Group type")
+
+
+class OrganizationSchema(_GroupOrgSchema):
     schema_id = "https://github.com/ckan/ckanext-scheming/scheming_dynamic/organization_schema.schema.json"
     title = "ckanext-scheming organization schema"
     description = (
         "Structural schema for a ckanext-scheming organization schema definition"
     )
 
-    def required(self) -> list[str]:
-        return super().required() + ["organization_type", "fields"]
-
-    def properties(self) -> dict[str, Any]:
-        return {
-            **super().properties(),
-            "organization_type": {
-                "type": "string",
-                "title": tk._("Organization type"),
-                "minLength": 1,
-            },
-            "fields": {**self.FIELD_LIST, "title": tk._("Fields")},
-        }
+    type_field = "organization_type"
+    type_title = tk._("Organization type")
 
 
 class PresetSchema(BaseSchema):
@@ -479,7 +500,7 @@ class PresetSchema(BaseSchema):
 
 
 SCHEMA_CLASSES: dict[str, type[BaseSchema]] = {
-    "dataset": DatasetSchema,
+    DEFAULT_ENTITY_TYPE: DatasetSchema,
     "group": GroupSchema,
     "organization": OrganizationSchema,
 }

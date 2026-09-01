@@ -348,7 +348,7 @@ class SchemingSchemaActivity(tk.BaseModel):
     DELETE = "delete"
 
     @classmethod
-    def record(  # noqa: PLR0913
+    def record(  # noqa: PLR0913 PLR0917
         cls,
         entity_type: str,
         schema_type: str,
@@ -412,28 +412,31 @@ class SchemingSchemaActivity(tk.BaseModel):
 
     @classmethod
     def get_schema_types(
-        cls, entity_type: str, limit: int | None = None, offset: int = 0
-    ) -> list[str]:
-        """Every schema_type with recorded activity, live or deleted."""
-        query = (
-            model.Session.query(cls.schema_type, sa.func.max(cls.created))
-            .filter(cls.entity_type == entity_type)
-            .group_by(cls.schema_type)
-            .order_by(sa.func.max(cls.created).desc())
-        )
+        cls, entity_type: str | None = None, limit: int | None = None, offset: int = 0
+    ) -> list[tuple[str, str]]:
+        """Every (schema_type, entity_type) pair with recorded activity,
+        live or deleted; across all entity types when ``entity_type`` is
+        omitted."""
+        query = model.Session.query(
+            cls.schema_type, cls.entity_type, sa.func.max(cls.created)
+        ).group_by(cls.schema_type, cls.entity_type)
+        if entity_type is not None:
+            query = query.filter(cls.entity_type == entity_type)
+        query = query.order_by(sa.func.max(cls.created).desc())
         if limit is not None:
             query = query.limit(limit).offset(offset)
-        return [schema_type for schema_type, _ in query.all()]
+        return [
+            (schema_type, entity_type) for schema_type, entity_type, _ in query.all()
+        ]
 
     @classmethod
-    def count_schema_types(cls, entity_type: str) -> int:
-        """How many distinct schema_types have recorded activity."""
-        return (
-            model.Session.query(cls.schema_type)
-            .filter(cls.entity_type == entity_type)
-            .distinct()
-            .count()
-        )
+    def count_schema_types(cls, entity_type: str | None = None) -> int:
+        """How many distinct (schema_type, entity_type) pairs have recorded
+        activity; across all entity types when ``entity_type`` is omitted."""
+        query = model.Session.query(cls.schema_type, cls.entity_type).distinct()
+        if entity_type is not None:
+            query = query.filter(cls.entity_type == entity_type)
+        return query.count()
 
     def as_dict(self) -> dict[str, Any]:
         return {

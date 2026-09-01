@@ -21,6 +21,8 @@
 {% endblock %}
 
 {% block primary_content_inner %}
+  {% set entity_type = entity_type or 'dataset' %}
+  {% set route_args = {} if entity_type == 'dataset' else {'entity_type': entity_type} %}
   {% snippet 'scheming_dynamic/snippets/tabs.html', active_tab=active_tab %}
 
   <h1 class="page-heading">{{ _('History for {type} schema').format(type=schema_type) }}</h1>
@@ -61,7 +63,7 @@
               {% endif %}
 
               {% if not (page.page == 1 and loop.first) or entry.action == 'delete' %}
-                <form method="post" action="{% url_for 'scheming_dynamic_admin.restore', schema_type=schema_type, activity_id=entry.id %}">
+                <form method="post" action="{{ h.url_for('scheming_dynamic_admin.restore', schema_type=schema_type, activity_id=entry.id, **route_args) }}">
                   {{ h.csrf_input() }}
                   <a type="submit" class="btn btn-secondary btn-sm mt-2"
                       data-module="confirm-action"
@@ -79,13 +81,13 @@
         </div>
       {% endfor %}
     </div>
-    {{ page.pager(schema_type=schema_type) }}
+    {{ page.pager(schema_type=schema_type, **route_args) }}
   {% else %}
     <p class="empty">{{ _('No history recorded for this schema type.') }}</p>
   {% endif %}
 
   <div class="form-actions">
-    <a class="btn btn-secondary mt-3" href="{% url_for 'scheming_dynamic_admin.history_index' %}">
+    <a class="btn btn-secondary mt-3" href="{{ h.url_for('scheming_dynamic_admin.history_index') }}">
         {{ _('Back to history') }}
     </a>
   </div>

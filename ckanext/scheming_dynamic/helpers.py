@@ -5,11 +5,14 @@ from typing import Any
 import ckan.plugins.toolkit as tk
 
 from ckanext.scheming_dynamic import sync
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import SchemingSchemaPin
 
 
 def dynamic_scheming_get_entity_schema(
-    schema_type: str, entity_type: str = "dataset", entity_id: str | None = None
+    schema_type: str,
+    entity_type: str = DEFAULT_ENTITY_TYPE,
+    entity_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Return the expanded schema for an entity, honoring its version pin.
 

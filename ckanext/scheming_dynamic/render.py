@@ -33,21 +33,28 @@ def render_preset_field(preset_name: str, values: dict[str, Any]) -> str:
     )
 
 
-def render_schema_form(dataset_type: str, definition: dict[str, Any]) -> str:
-    """Expand and render a dataset schema's preview form, to confirm it renders.
+def render_schema_form(
+    entity_type: str, schema_type: str, definition: dict[str, Any]
+) -> str:
+    """Expand and render a schema's preview form, to confirm it renders.
 
-    Raises whatever exception schema expansion or the form snippet render
-    raises if the schema can't be expanded/rendered.
+    Works for dataset, group and organization schemas. Raises whatever
+    exception schema expansion or the form snippet render raises if the
+    schema can't be expanded/rendered.
     """
     sync.ensure_presets_synced()
 
-    expanded = _expand_schemas({dataset_type: definition})[dataset_type]
+    expanded = _expand_schemas({schema_type: definition})[schema_type]
 
     # Lets build_dynamic_type_url() resolve this type's URLs (e.g. the slug
     # preview) even though it has no database row yet.
-    tk.g.scheming_dynamic_preview_type = dataset_type
+    tk.g.scheming_dynamic_preview_type = schema_type
 
     return tk.render(
         "scheming_dynamic/snippets/schema_preview.html",
-        {"schema": expanded, "licenses": model.Package.get_license_options()},
+        {
+            "schema": expanded,
+            "entity_type": entity_type,
+            "licenses": model.Package.get_license_options(),
+        },
     )

@@ -9,6 +9,7 @@ from ckan.common import CKANConfig
 
 from ckanext.scheming_dynamic import views
 from ckanext.scheming_dynamic.cli import get_commands
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.utils import ensure_pinned
 
 
@@ -57,6 +58,6 @@ class SchemingDynamicPlugin(p.SingletonPlugin):
         if isinstance(entity, model.Group):
             entity_type = "organization" if entity.is_organization else "group"
         else:
-            entity_type = "dataset"
+            entity_type = DEFAULT_ENTITY_TYPE
 
         ensure_pinned(entity_type, entity.id, entity.type)

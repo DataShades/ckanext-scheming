@@ -12,7 +12,7 @@ import ckan.plugins.toolkit as tk
 from ckan.lib.pagination import Page
 from ckan.views.admin import before_request
 
-from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE, TYPE_FIELDS
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
     SchemingSchemaActivity,
@@ -26,17 +26,22 @@ from ckanext.scheming_dynamic.preset_resolve import (
 from ckanext.scheming_dynamic.render import render_preset_field, render_schema_form
 from ckanext.scheming_dynamic.schema import SCHEMA_CLASSES, PresetSchema
 from ckanext.scheming_dynamic.validator import error_location, iter_errors
+from ckanext.scheming_dynamic.views.routing import entity_route
 
 ADMIN_BP = "scheming_dynamic_admin"
 HISTORY_PAGE_SIZE = 10
 SCHEMA_TYPES_PAGE_SIZE = 20
 
-
 bp = Blueprint(ADMIN_BP, __name__, url_prefix="/ckan-admin/scheming")
 
 
-def _meta_schema() -> dict[str, Any]:
-    return SCHEMA_CLASSES[DEFAULT_ENTITY_TYPE]().build()
+def _check_entity_type(entity_type: str) -> None:
+    if entity_type not in SCHEMA_CLASSES:
+        tk.abort(404, tk._("Unknown entity type"))
+
+
+def _meta_schema(entity_type: str) -> dict[str, Any]:
+    return SCHEMA_CLASSES[entity_type]().build()
 
 
 def _preset_meta_schema(exclude_preset_name: str | None = None) -> dict[str, Any]:
@@ -44,6 +49,7 @@ def _preset_meta_schema(exclude_preset_name: str | None = None) -> dict[str, Any
 
 
 def index() -> str:
+    """List the head version of every schema, across all entity types."""
     schemas = [
         {
             "schema_type": row.schema_type,
@@ -54,8 +60,10 @@ def index() -> str:
                 row.entity_type, row.schema_type, row.version
             ),
         }
-        for row in SchemingSchemaVersion.get_heads_of_type(DEFAULT_ENTITY_TYPE)
+        for entity_type in SCHEMA_CLASSES
+        for row in SchemingSchemaVersion.get_heads_of_type(entity_type)
     ]
+    schemas.sort(key=lambda s: (s["entity_type"], s["schema_type"]))
 
     return tk.render(
         "scheming_dynamic/index.html",
@@ -66,31 +74,36 @@ def index() -> str:
 class CreateView(MethodView):
     def get(
         self,
+        entity_type: str = DEFAULT_ENTITY_TYPE,
         data: dict[str, Any] | None = None,
         errors: dict[str, Any] | None = None,
         error_summary: dict[str, Any] | None = None,
     ) -> str:
+        _check_entity_type(entity_type)
         return tk.render(
             "scheming_dynamic/schema_form.html",
             {
                 "data": data or {},
                 "errors": errors or {},
                 "error_summary": error_summary or {},
-                "meta_schema": _meta_schema(),
+                "meta_schema": _meta_schema(entity_type),
                 "presets": tk.h.scheming_get_presets() or {},
                 "is_new": True,
+                "entity_type": entity_type,
             },
         )
 
-    def post(self) -> str | Any:
+    def post(self, entity_type: str = DEFAULT_ENTITY_TYPE) -> str | Any:
+        _check_entity_type(entity_type)
         data = {
+            "entity_type": entity_type,
             "definition": tk.request.form.get("definition", ""),
         }
 
         try:
             row = tk.get_action("scheming_schema_create")({}, dict(data))
         except tk.ValidationError as e:
-            return self.get(data, e.error_dict, e.error_summary)
+            return self.get(entity_type, data, e.error_dict, e.error_summary)
 
         tk.h.flash_success(tk._("Schema '{}' created.").format(row["schema_type"]))
         return tk.redirect_to(f"{ADMIN_BP}.index")
@@ -100,11 +113,13 @@ class EditView(MethodView):
     def get(
         self,
         schema_type: str,
+        entity_type: str = DEFAULT_ENTITY_TYPE,
         data: dict[str, Any] | None = None,
         errors: dict[str, Any] | None = None,
         error_summary: dict[str, Any] | None = None,
     ) -> str:
-        schema = SchemingSchemaVersion.head(DEFAULT_ENTITY_TYPE, schema_type)
+        _check_entity_type(entity_type)
+        schema = SchemingSchemaVersion.head(entity_type, schema_type)
         if not schema:
             return tk.abort(404, tk._("Schema not found"))
 
@@ -122,15 +137,20 @@ class EditView(MethodView):
                 "data": data,
                 "errors": errors or {},
                 "error_summary": error_summary or {},
-                "meta_schema": _meta_schema(),
+                "meta_schema": _meta_schema(entity_type),
                 "presets": tk.h.scheming_get_presets() or {},
                 "is_new": False,
                 "schema_type": schema_type,
+                "entity_type": entity_type,
             },
         )
 
-    def post(self, schema_type: str) -> str | Any:
+    def post(
+        self, schema_type: str, entity_type: str = DEFAULT_ENTITY_TYPE
+    ) -> str | Any:
+        _check_entity_type(entity_type)
         data = {
+            "entity_type": entity_type,
             "schema_type": schema_type,
             "definition": tk.request.form.get("definition", ""),
         }
@@ -140,7 +160,9 @@ class EditView(MethodView):
         except tk.ObjectNotFound:
             return tk.abort(404, tk._("Schema not found"))
         except tk.ValidationError as e:
-            return self.get(schema_type, data, e.error_dict, e.error_summary)
+            return self.get(
+                schema_type, entity_type, data, e.error_dict, e.error_summary
+            )
 
         tk.h.flash_success(
             tk._("Schema '{}' updated; now at version {}.").format(
@@ -150,8 +172,8 @@ class EditView(MethodView):
         return tk.redirect_to(f"{ADMIN_BP}.index")
 
 
-def history(schema_type: str) -> str:
-    entity_type = DEFAULT_ENTITY_TYPE
+def history(schema_type: str, entity_type: str = DEFAULT_ENTITY_TYPE) -> str:
+    _check_entity_type(entity_type)
     page_number = tk.h.get_page_number(tk.request.args)
 
     total = SchemingSchemaActivity.count_history(entity_type, schema_type)
@@ -209,6 +231,7 @@ def history(schema_type: str) -> str:
         "scheming_dynamic/schema_history.html",
         {
             "schema_type": schema_type,
+            "entity_type": entity_type,
             "page": Page(
                 entries,
                 page=page_number,
@@ -243,23 +266,29 @@ def _highlight_diff(diff_text: str) -> Markup:
 
 
 def history_index() -> str:
-    """List every schema_type with recorded activity, live or deleted."""
-    entity_type = DEFAULT_ENTITY_TYPE
+    """List every schema_type with recorded activity, live or deleted,
+    across all entity types."""
     page_number = tk.h.get_page_number(tk.request.args)
 
-    total = SchemingSchemaActivity.count_schema_types(entity_type)
+    total = SchemingSchemaActivity.count_schema_types()
     offset = (page_number - 1) * SCHEMA_TYPES_PAGE_SIZE
     schema_types = SchemingSchemaActivity.get_schema_types(
-        entity_type, limit=SCHEMA_TYPES_PAGE_SIZE, offset=offset
+        limit=SCHEMA_TYPES_PAGE_SIZE, offset=offset
     )
 
     live = {
-        row.schema_type for row in SchemingSchemaVersion.get_heads_of_type(entity_type)
+        (entity_type, row.schema_type)
+        for entity_type in SCHEMA_CLASSES
+        for row in SchemingSchemaVersion.get_heads_of_type(entity_type)
     }
 
     rows = [
-        {"schema_type": t, "entity_type": entity_type, "is_live": t in live}
-        for t in schema_types
+        {
+            "schema_type": schema_type,
+            "entity_type": entity_type,
+            "is_live": (entity_type, schema_type) in live,
+        }
+        for schema_type, entity_type in schema_types
     ]
 
     return tk.render(
@@ -277,13 +306,14 @@ def history_index() -> str:
     )
 
 
-def preview() -> Any:
+def preview(entity_type: str = DEFAULT_ENTITY_TYPE) -> Any:
     """Render unsaved schema definition as a preview.
 
     Returns an HTML fragment: either the rendered form fields or the list
     of validation errors (with a 400 status) when the definition cannot be
     rendered.
     """
+    _check_entity_type(entity_type)
     raw = tk.request.form.get("definition", "")
 
     try:
@@ -293,16 +323,15 @@ def preview() -> Any:
 
     errors = [
         f"{error_location(e)}: {e.message}"
-        for e in iter_errors(definition, SCHEMA_CLASSES[DEFAULT_ENTITY_TYPE]())
+        for e in iter_errors(definition, SCHEMA_CLASSES[entity_type]())
     ]
     if errors:
         return _preview_errors(errors)
 
-    # TODO: works for dataset schemas only
-    dataset_type = definition["dataset_type"]
+    schema_type = definition[TYPE_FIELDS[entity_type]]
 
     try:
-        body = render_schema_form(dataset_type, definition)
+        body = render_schema_form(entity_type, schema_type, definition)
     except Exception as e:  # noqa: BLE001
         return _preview_errors([tk._("Schema cannot be rendered: {}").format(e)])
 
@@ -328,27 +357,34 @@ def _with_queued_assets(body: str) -> str:
     )
 
 
-def restore(schema_type: str, activity_id: str) -> Any:
+def restore(
+    schema_type: str, activity_id: str, entity_type: str = DEFAULT_ENTITY_TYPE
+) -> Any:
     """Re-apply a historical activity entry's definition to the schema."""
+    _check_entity_type(entity_type)
     entry = SchemingSchemaActivity.get(activity_id)
 
     if (
         not entry
         or entry.schema_type != schema_type
-        or entry.entity_type != DEFAULT_ENTITY_TYPE
+        or entry.entity_type != entity_type
     ):
         return tk.abort(404, tk._("Activity entry not found"))
 
-    if SchemingSchemaVersion.head(DEFAULT_ENTITY_TYPE, schema_type):
+    if SchemingSchemaVersion.head(entity_type, schema_type):
         action, data = (
             "scheming_schema_update",
             {
+                "entity_type": entity_type,
                 "schema_type": schema_type,
                 "definition": entry.definition,
             },
         )
     else:
-        action, data = "scheming_schema_create", {"definition": entry.definition}
+        action, data = (
+            "scheming_schema_create",
+            {"entity_type": entity_type, "definition": entry.definition},
+        )
 
     try:
         tk.get_action(action)({}, data)
@@ -357,18 +393,28 @@ def restore(schema_type: str, activity_id: str) -> Any:
     else:
         tk.h.flash_success(tk._("Schema '{}' restored.").format(schema_type))
 
-    return tk.redirect_to(f"{ADMIN_BP}.history", schema_type=schema_type)
+    return tk.redirect_to(
+        f"{ADMIN_BP}.history", schema_type=schema_type, **_route_args(entity_type)
+    )
 
 
-def delete(schema_type: str) -> Any:
+def delete(schema_type: str, entity_type: str = DEFAULT_ENTITY_TYPE) -> Any:
+    _check_entity_type(entity_type)
     try:
-        tk.get_action("scheming_schema_delete")({}, {"schema_type": schema_type})
+        tk.get_action("scheming_schema_delete")(
+            {}, {"entity_type": entity_type, "schema_type": schema_type}
+        )
     except tk.ValidationError as e:
         tk.h.flash_error("; ".join(e.error_summary.values()))
     else:
         tk.h.flash_success(tk._("Schema '{}' has been deleted.").format(schema_type))
 
     return tk.redirect_to(f"{ADMIN_BP}.index")
+
+
+def _route_args(entity_type: str) -> dict[str, str]:
+    """url_for kwargs so the non-dataset routes carry their entity_type."""
+    return {} if entity_type == DEFAULT_ENTITY_TYPE else {"entity_type": entity_type}
 
 
 def presets_index() -> str:
@@ -531,16 +577,51 @@ def preset_delete(preset_name: str) -> Any:
 
 
 bp.before_request(before_request)
-bp.add_url_rule("/", view_func=index)
-bp.add_url_rule("/new", view_func=CreateView.as_view("new"))
-bp.add_url_rule("/<schema_type>/edit", view_func=EditView.as_view("edit"))
-bp.add_url_rule("/history", view_func=history_index)
-bp.add_url_rule("/<schema_type>/history", view_func=history)
-bp.add_url_rule(
-    "/<schema_type>/history/<activity_id>/restore", view_func=restore, methods=["POST"]
+
+
+bp.add_url_rule("/", endpoint="index", view_func=index)
+entity_route(
+    bp, "/new", "/{prefix}/new", endpoint="new", view_func=CreateView.as_view("new")
 )
-bp.add_url_rule("/<schema_type>/delete", view_func=delete, methods=["POST"])
-bp.add_url_rule("/preview", view_func=preview, methods=["POST"])
+entity_route(
+    bp,
+    "/<schema_type>/edit",
+    "/{prefix}/<schema_type>/edit",
+    endpoint="edit",
+    view_func=EditView.as_view("edit"),
+)
+bp.add_url_rule("/history", endpoint="history_index", view_func=history_index)
+entity_route(
+    bp,
+    "/<schema_type>/history",
+    "/{prefix}/<schema_type>/history",
+    endpoint="history",
+    view_func=history,
+)
+entity_route(
+    bp,
+    "/<schema_type>/history/<activity_id>/restore",
+    "/{prefix}/<schema_type>/history/<activity_id>/restore",
+    endpoint="restore",
+    view_func=restore,
+    methods=["POST"],
+)
+entity_route(
+    bp,
+    "/<schema_type>/delete",
+    "/{prefix}/<schema_type>/delete",
+    endpoint="delete",
+    view_func=delete,
+    methods=["POST"],
+)
+entity_route(
+    bp,
+    "/preview",
+    "/{prefix}/preview",
+    endpoint="preview",
+    view_func=preview,
+    methods=["POST"],
+)
 bp.add_url_rule("/presets/", view_func=presets_index)
 bp.add_url_rule("/presets/new", view_func=PresetCreateView.as_view("preset_new"))
 bp.add_url_rule(

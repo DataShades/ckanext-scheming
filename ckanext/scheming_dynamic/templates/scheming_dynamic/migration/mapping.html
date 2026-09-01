@@ -3,11 +3,17 @@
 {% import 'scheming_dynamic/migration/snippets/mapping_row.html' as rows %}
 
 {% set diff = plan.diff %}
-{% set groups = [('dataset_fields', _('Dataset fields')), ('resource_fields', _('Resource fields'))] %}
+{% set groups = {
+    "dataset": [('dataset_fields', _('Dataset fields')), ('resource_fields', _('Resource fields'))],
+    "group": [('fields', _('Fields'))],
+    "organization": [('fields', _('Fields'))]
+} %}
 
 {% block subtitle %}{{ _('Scheming') }}{% endblock %}
 
 {% block primary_content_inner %}
+  {% set entity_type = plan.entity_type or 'dataset' %}
+  {% set route_args = {} if entity_type == 'dataset' else {'entity_type': entity_type} %}
   {% snippet 'scheming_dynamic/snippets/tabs.html', active_tab=active_tab %}
 
   <h2>
@@ -26,7 +32,7 @@
   <form method="post">
     {{ h.csrf_input() }}
 
-    {% for group, group_label in groups %}
+    {% for group, group_label in groups[entity_type] %}
       {% set pending = diff[group].fields|selectattr('needs_input')|list %}
       {% set automatic = diff[group].fields|rejectattr('needs_input')|list %}
 
@@ -69,7 +75,7 @@
     {% endfor %}
 
     <div class="form-actions">
-      <a class="btn btn-secondary" href="{% url_for 'scheming_dynamic_migration.index' %}">
+      <a class="btn btn-secondary" href="{{ h.url_for('scheming_dynamic_migration.index') }}">
         {{ _('Back') }}
       </a>
       <button class="btn btn-primary float-end" type="submit">
@@ -79,7 +85,7 @@
   </form>
 
   <form method="post"
-        action="{% url_for 'scheming_dynamic_migration.apply_all', schema_type=plan.schema_type, from_version=plan.from_version, to_version=plan.to_version %}">
+        action="{{ h.url_for('scheming_dynamic_migration.apply_all', schema_type=plan.schema_type, from_version=plan.from_version, to_version=plan.to_version, **route_args) }}">
     {{ h.csrf_input() }}
     <div class="form-actions mt-3">
       {% if plan.unresolved %}

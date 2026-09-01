@@ -1,19 +1,11 @@
 from ckan import types
 from ckan.logic.schema import validator_args
 
-DEFAULT_ENTITY_TYPE = "dataset"
-# TODO: group/organization dynamic schemas are not supported yet
-ENTITY_TYPES = [DEFAULT_ENTITY_TYPE]
-
-TYPE_FIELDS = {
-    "dataset": "dataset_type",
-    "group": "group_type",
-    "organization": "organization_type",
-}
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE, ENTITY_TYPES
 
 
 @validator_args
-def scheming_schema_create(  # noqa: PLR0913
+def scheming_schema_create(
     not_missing: types.Validator,
     unicode_safe: types.Validator,
     convert_to_json_if_string: types.Validator,
@@ -51,7 +43,7 @@ def scheming_schema_update(
 
 
 @validator_args
-def scheming_schema_delete(  # noqa: PLR0913
+def scheming_schema_delete(
     scheming_schema_not_in_use: types.DataValidator,
     not_missing: types.Validator,
     unicode_safe: types.Validator,
@@ -137,7 +129,7 @@ def scheming_preset_delete(
 
 
 @validator_args
-def _migration_version_pair( # noqa: PLR0913
+def _migration_version_pair(
     not_missing: types.Validator,
     unicode_safe: types.Validator,
     int_validator: types.Validator,
@@ -202,7 +194,7 @@ def scheming_migration_status(
 
 
 @validator_args
-def scheming_migration_apply(  # noqa: PLR0913
+def scheming_migration_apply(
     ignore_missing: types.Validator,
     unicode_safe: types.Validator,
     boolean_validator: types.Validator,

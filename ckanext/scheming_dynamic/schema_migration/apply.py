@@ -8,15 +8,24 @@ from ckan import model, types
 from ckan.lib import plugins as lib_plugins
 
 from ckanext.scheming.plugins import _expand_schemas
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import SchemingSchemaPin, SchemingSchemaVersion
 from ckanext.scheming_dynamic.schema_migration.diff import (
     CONSTANT,
     COPY,
     DATASET_GROUP,
     DEFAULT,
+    FIELDS_GROUP,
     RESOURCE_GROUP,
 )
 from ckanext.scheming_dynamic.schema_migration.model import MigrationRunItem
+
+# per entity type: (show action, update action, primary field group)
+_ENTITY_ACTIONS = {
+    DEFAULT_ENTITY_TYPE: ("package_show", "package_update", DATASET_GROUP),
+    "group": ("group_show", "group_update", FIELDS_GROUP),
+    "organization": ("organization_show", "organization_update", FIELDS_GROUP),
+}
 
 
 @dataclasses.dataclass
@@ -40,42 +49,67 @@ def expanded_definition(
     return _expand_schemas({schema_type: row.definition})[schema_type]
 
 
-def datasets_at_version(schema_type: str, version: int) -> list[str]:
+def entities_at_version(entity_type: str, schema_type: str, version: int) -> list[str]:
+    if entity_type == DEFAULT_ENTITY_TYPE:
+        entity_model = model.Package
+        extra = [model.Package.type == schema_type]
+    else:
+        entity_model = model.Group
+        extra = [
+            model.Group.type == schema_type,
+            model.Group.is_organization == (entity_type == "organization"),
+        ]
+
     return [
         row[0]
-        for row in model.Session.query(model.Package.id)
-        .join(SchemingSchemaPin, SchemingSchemaPin.entity_id == model.Package.id)
+        for row in model.Session.query(entity_model.id)
+        .join(SchemingSchemaPin, SchemingSchemaPin.entity_id == entity_model.id)
         .filter(
-            model.Package.type == schema_type,
-            model.Package.state == model.State.ACTIVE,
-            SchemingSchemaPin.entity_type == "dataset",
+            entity_model.state == model.State.ACTIVE,
+            SchemingSchemaPin.entity_type == entity_type,
             SchemingSchemaPin.schema_type == schema_type,
             SchemingSchemaPin.version == version,
+            *extra,
         )
         .all()
     ]
 
 
+def datasets_at_version(schema_type: str, version: int) -> list[str]:
+    """Backwards-compatible wrapper for ``entities_at_version(DEFAULT_ENTITY_TYPE, ...)``."""
+    return entities_at_version(DEFAULT_ENTITY_TYPE, schema_type, version)
+
+
 class Migrator:
-    """Moves datasets of one schema type from one version to another."""
+    """Moves entities of one schema type from one version to another.
 
-    entity_type = "dataset"
+    Handles dataset, group and organization schemas. Datasets carry a
+    resource sub-form; groups/organizations have a single flat ``fields``
+    list and no resources.
+    """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: PLR0913 PLR0917
         self,
         schema_type: str,
+        entity_type: str,
         from_version: int,
         to_version: int,
         mapping: dict[str, Any],
         user: str,
         dry_run: bool = False,
     ):
+        self.entity_type = entity_type
         self.schema_type = schema_type
         self.from_version = from_version
         self.to_version = to_version
         self.mapping = mapping
         self.user = user
         self.dry_run = dry_run
+
+        self._show_action, self._update_action, self._primary_group = _ENTITY_ACTIONS[
+            entity_type
+        ]
+        self._has_resources = entity_type == DEFAULT_ENTITY_TYPE
 
         self.source_schema = expanded_definition(
             self.entity_type, schema_type, from_version
@@ -97,7 +131,9 @@ class Migrator:
                 errors={"pin": [f"pinned to version {pin.version}"]},
             )
 
-        before = tk.get_action("package_show")(self._read_context(), {"id": entity_id})
+        before = tk.get_action(self._show_action)(
+            self._read_context(), {"id": entity_id}
+        )
         data = self._build(before)
 
         pin.version = self.to_version
@@ -107,7 +143,7 @@ class Migrator:
             return self._validate_only(entity_id, data)
 
         try:
-            after = tk.get_action("package_update")(self._context(), data)
+            after = tk.get_action(self._update_action)(self._context(), data)
         except tk.ValidationError as e:
             model.Session.rollback()
             return ItemResult(entity_id, MigrationRunItem.FAILED, errors=e.error_dict)
@@ -120,7 +156,11 @@ class Migrator:
 
     def _build(self, before: dict[str, Any]) -> dict[str, Any]:
         return build_target_data(
-            before, self.mapping, self.source_schema, self.target_schema
+            before,
+            self.mapping,
+            self.source_schema,
+            self.target_schema,
+            self.entity_type,
         )
 
     def failure(self, entity_id: str, message: str) -> ItemResult:
@@ -130,25 +170,33 @@ class Migrator:
 
     def _validate_only(self, entity_id: str, data: dict[str, Any]) -> ItemResult:
         """Run the target version's validators without writing anything."""
-        plugin = lib_plugins.lookup_package_plugin(self.schema_type)
+        if self.entity_type == DEFAULT_ENTITY_TYPE:
+            plugin = lib_plugins.lookup_package_plugin(self.schema_type)
+            registered = self.schema_type in plugin.package_types()
+            update_schema = plugin.update_package_schema()
+            context = self._context()
+            context["package"] = cast("model.Package", model.Package.get(entity_id))
+        else:
+            plugin = lib_plugins.lookup_group_plugin(self.schema_type)
+            registered = self.schema_type in plugin.group_types()
+            update_schema = plugin.update_group_schema()
+            context = self._context()
+            context["group"] = model.Group.get(entity_id)
 
-        if self.schema_type not in plugin.package_types():
+        if not registered:
             return self.failure(
                 entity_id,
                 f"'{self.schema_type}' is not registered with a scheming plugin, "
                 "so it cannot be validated",
             )
 
-        context = self._context()
-        context["package"] = cast("model.Package", model.Package.get(entity_id))
-
         try:
             _, errors = lib_plugins.plugin_validate(
                 plugin,
                 context,
                 data,
-                plugin.update_package_schema(),
-                "package_update",
+                update_schema,
+                self._update_action,
             )
         finally:
             model.Session.rollback()
@@ -161,24 +209,24 @@ class Migrator:
     def _changes(
         self, before: dict[str, Any], after: dict[str, Any]
     ) -> dict[str, Any] | None:
-        dataset_names = self._tracked_names(DATASET_GROUP)
-        resource_names = self._tracked_names(RESOURCE_GROUP)
+        primary_names = self._tracked_names(self._primary_group)
+        primary = _changed_fields(before, after, primary_names)
 
-        dataset = _changed_fields(before, after, dataset_names)
-        after_resources = {r["id"]: r for r in after.get("resources", [])}
         resources = {}
+        if self._has_resources:
+            resource_names = self._tracked_names(RESOURCE_GROUP)
+            after_resources = {r["id"]: r for r in after.get("resources", [])}
+            for resource in before.get("resources", []):
+                changed = _changed_fields(
+                    resource, after_resources.get(resource["id"], {}), resource_names
+                )
+                if changed:
+                    resources[resource["id"]] = changed
 
-        for resource in before.get("resources", []):
-            changed = _changed_fields(
-                resource, after_resources.get(resource["id"], {}), resource_names
-            )
-            if changed:
-                resources[resource["id"]] = changed
-
-        if not dataset and not resources:
+        if not primary and not resources:
             return None
 
-        return {"dataset": dataset, "resources": resources}
+        return {"dataset": primary, "resources": resources}
 
     def _tracked_names(self, group: str) -> set[str]:
         return _field_names(self.source_schema, group) | _field_names(
@@ -209,18 +257,25 @@ def build_target_data(
     mapping: dict[str, Any],
     source_schema: dict[str, Any],
     target_schema: dict[str, Any],
+    entity_type: str = DEFAULT_ENTITY_TYPE,
 ) -> dict[str, Any]:
-    """The dataset as it should look under the target schema.
+    """The entity as it should look under the target schema.
 
     Source-schema fields are stripped first, so a field the mapping does not
     carry over leaves no leftover extra behind.
     """
-    data = _apply_group(before, DATASET_GROUP, mapping, source_schema, target_schema)
+    primary_group = (
+        DATASET_GROUP if entity_type == DEFAULT_ENTITY_TYPE else FIELDS_GROUP
+    )
+    data = _apply_group(before, primary_group, mapping, source_schema, target_schema)
 
-    data["resources"] = [
-        _apply_group(resource, RESOURCE_GROUP, mapping, source_schema, target_schema)
-        for resource in before.get("resources", [])
-    ]
+    if entity_type == DEFAULT_ENTITY_TYPE:
+        data["resources"] = [
+            _apply_group(
+                resource, RESOURCE_GROUP, mapping, source_schema, target_schema
+            )
+            for resource in before.get("resources", [])
+        ]
 
     return data
 

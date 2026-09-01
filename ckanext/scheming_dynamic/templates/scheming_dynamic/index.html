@@ -1,5 +1,7 @@
 {% extends "admin/base.html" %}
 
+{% set entity_types = [('dataset', _('Dataset')), ('group', _('Group')), ('organization', _('Organization'))] %}
+
 {% block subtitle %}{{ _('Scheming') }}{% endblock %}
 
 {% block primary_content_inner %}
@@ -9,8 +11,8 @@
     <table class="table table-header table-hover table-striped">
       <thead>
         <tr>
-          <th>{{ _('Schema type') }}</th>
           <th>{{ _('Entity type') }}</th>
+          <th>{{ _('Schema type') }}</th>
           <th>{{ _('Version') }}</th>
           <th>{{ _('Last updated') }}</th>
           <th>&nbsp;</th>
@@ -18,9 +20,10 @@
       </thead>
       <tbody>
         {% for schema in schemas %}
+          {% set row_args = {} if schema.entity_type == 'dataset' else {'entity_type': schema.entity_type} %}
           <tr>
-            <td>{{ schema.schema_type }}</td>
             <td>{{ schema.entity_type }}</td>
+            <td>{{ schema.schema_type }}</td>
             <td>
               {{ schema.version }}
               {% if schema.is_locked %}
@@ -37,17 +40,17 @@
             </td>
             <td>{{ h.render_datetime(schema.created, with_hours=True) }}</td>
             <td>
-              <form method="post" action="{% url_for 'scheming_dynamic_admin.delete', schema_type=schema.schema_type %}">
+              <form method="post" action="{{ h.url_for('scheming_dynamic_admin.delete', schema_type=schema.schema_type, **row_args) }}">
                 <div class="btn-group float-end">
                   <a class="btn btn-secondary btn-sm"
-                      href="{% url_for 'scheming_dynamic_admin.history', schema_type=schema.schema_type %}"
+                      href="{{ h.url_for('scheming_dynamic_admin.history', schema_type=schema.schema_type, **row_args) }}"
                       aria-label="{{ _('View schema history') }}"
                       data-bs-title="{{ _('View schema history') }}"
                       data-bs-toggle="tooltip">
                     <i class="fa fa-history"></i>
                   </a>
                   <a class="btn btn-secondary btn-sm"
-                      href="{% url_for 'scheming_dynamic_admin.edit', schema_type=schema.schema_type %}"
+                      href="{{ h.url_for('scheming_dynamic_admin.edit', schema_type=schema.schema_type, **row_args) }}"
                       aria-label="{{ _('Edit schema') }}"
                       data-bs-title="{{ _('Edit schema') }}"
                       data-bs-toggle="tooltip">
@@ -75,10 +78,21 @@
     <p class="empty">{{ _('No dynamic schemas have been created yet.') }}</p>
   {% endif %}
 
-  <div class="form-actions">
-    <a class="btn btn-primary float-end" href="{% url_for 'scheming_dynamic_admin.new' %}">
+  <div class="form-actions overflow-visible">
+    <div class="dropdown btn-group float-end">
+      <a class="btn btn-primary dropdown-toggle" role="button" id="dropdownAddSchema" data-bs-toggle="dropdown" aria-expanded="false" href="#">
         <i class="fa fa-plus-square"></i> {{ _('Add schema') }}
-    </a>
+        <span class="caret"></span>
+      </a>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownAddSchema">
+        {% for et, label in entity_types %}
+          {% set et_args = {} if et == 'dataset' else {'entity_type': et} %}
+          <li>
+            <a class="dropdown-item" href="{{ h.url_for('scheming_dynamic_admin.new', **et_args) }}">{{ label }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
 {% endblock %}
 
@@ -87,12 +101,12 @@
     <div class="module-group">
       <h2 class="module-heading">
         <i class="fa fa-info-circle"></i>
-        {{ _('Dataset schemas') }}
+        {{ _('Dynamic schemas') }}
       </h2>
       <div class="module-content">
         {%- trans -%}
           <p>Dynamic scheming schemas are stored in the database and become
-          available immediately: each schema defines a dataset type with its
+          available immediately: each schema defines an entity type with its
           own metadata fields.</p>
           <p>Schemas configured through config files are not listed here and
           cannot be edited from this page.</p>

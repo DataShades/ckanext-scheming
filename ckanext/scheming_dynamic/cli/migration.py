@@ -36,7 +36,7 @@ def migration():
 @click.argument("to_version", type=int)
 @click.option("--json", "as_json", is_flag=True, help="Output the mapping as JSON.")
 @click.pass_context
-def mapping(  # noqa: PLR0913
+def mapping(
     ctx: click.Context,
     entity_type: str,
     schema_type: str,
@@ -66,10 +66,7 @@ def mapping(  # noqa: PLR0913
         click.echo(json.dumps(result["mapping"], indent=2))
         return
 
-    for group in (
-        "dataset_fields",
-        "resource_fields",
-    ):
+    for group in result["diff"]:
         for change in result["diff"][group]["fields"]:
             marker = "?" if change["needs_input"] else " "
             source = change["source"] or "--"
@@ -100,7 +97,7 @@ def mapping(  # noqa: PLR0913
 @click.argument("to_version", type=int)
 @click.option("--dry-run", is_flag=True, help="Validate without writing anything.")
 @click.pass_context
-def apply(  # noqa: PLR0913
+def apply(
     ctx: click.Context,
     entity_type: str,
     schema_type: str,
@@ -127,6 +124,7 @@ def apply(  # noqa: PLR0913
 
     run = runner.start(
         schema_type,
+        entity_type,
         from_version,
         to_version,
         mapping_doc,

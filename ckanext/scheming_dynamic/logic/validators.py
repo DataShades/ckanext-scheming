@@ -7,7 +7,7 @@ from ckan.lib.navl.dictization_functions import missing
 
 from ckanext.scheming.plugins import _expand_schemas
 from ckanext.scheming_dynamic import sync
-from ckanext.scheming_dynamic.logic.schema import DEFAULT_ENTITY_TYPE, TYPE_FIELDS
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE, TYPE_FIELDS
 from ckanext.scheming_dynamic.model import SchemingPreset, SchemingSchemaVersion
 from ckanext.scheming_dynamic.preset_resolve import (
     PresetBaseNotFoundError,
@@ -59,7 +59,7 @@ def scheming_definition_valid(
         raise tk.Invalid(tk._(f"'{type_field}' must not end with '_resource'."))
 
     try:
-        _expand_schemas({definition["dataset_type"]: definition})
+        _expand_schemas({definition[type_field]: definition})
     except Exception as e:
         raise tk.Invalid(tk._("Schema cannot be expanded: {}").format(e)) from e
 
@@ -85,22 +85,35 @@ def scheming_schema_not_in_use(
     errors: types.FlattenErrorDict,
     context: types.Context,
 ) -> Any:
-    """Refuse to delete a schema while a package still uses its type.
-
-    TODO: Only "dataset" dynamic schemas are supported for now.
-    """
+    """Refuse to delete a schema while an entity still uses its type."""
+    entity_type = data[("entity_type",)]
     schema_type = data[key]
 
-    in_use = (
-        model.Session.query(model.Package.id)
-        .filter(model.Package.type == schema_type)
-        .first()
-        is not None
-    )
+    if entity_type == DEFAULT_ENTITY_TYPE:
+        in_use = (
+            model.Session.query(model.Package.id)
+            .filter(model.Package.type == schema_type)
+            .first()
+            is not None
+        )
+        noun = "datasets"
+    else:
+        in_use = (
+            model.Session.query(model.Group.id)
+            .filter(
+                model.Group.type == schema_type,
+                model.Group.is_organization == (entity_type == "organization"),
+                model.Group.state != model.State.DELETED,
+            )
+            .first()
+            is not None
+        )
+        noun = "organizations" if entity_type == "organization" else "groups"
+
     if in_use:
         raise tk.Invalid(
             tk._(
-                f"Cannot delete schema '{schema_type}': datasets of this "
+                f"Cannot delete schema '{schema_type}': {noun} of this "
                 "type still exist."
             )
         )

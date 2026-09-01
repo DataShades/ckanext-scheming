@@ -3,6 +3,8 @@
 {% block subtitle %}{{ _('Scheming') }}{% endblock %}
 
 {% block primary_content_inner %}
+  {% set entity_type = plan.entity_type or 'dataset' %}
+  {% set route_args = {} if entity_type == 'dataset' else {'entity_type': entity_type} %}
   {% snippet 'scheming_dynamic/snippets/tabs.html', active_tab=active_tab %}
 
   <h2>
@@ -31,13 +33,13 @@
       {% for field in questions %}
         {% snippet 'scheming/snippets/form_field.html',
             field=field, data={}, errors={},
-            licenses=licenses, entity_type='dataset',
+            licenses=licenses, entity_type=entity_type,
             object_type=plan.schema_type %}
       {% endfor %}
 
       <div class="form-actions">
         <a class="btn btn-secondary"
-            href="{% url_for 'scheming_dynamic_migration.mapping', schema_type=plan.schema_type, from_version=plan.from_version, to_version=plan.to_version %}">
+            href="{{ h.url_for('scheming_dynamic_migration.mapping', schema_type=plan.schema_type, from_version=plan.from_version, to_version=plan.to_version, **route_args) }}">
           {{ _('Back') }}
         </a>
         <button class="btn btn-primary float-end" type="submit">
@@ -60,8 +62,10 @@
         {{ _('Current values') }}
       </h2>
       <div class="module-content">
+        {% set current_schema = h.scheming_get_schema(entity_type, plan.schema_type) %}
+        {% set current_fields = current_schema.dataset_fields if entity_type == 'dataset' else current_schema.fields %}
         <dl>
-          {% for field in h.scheming_get_dataset_schema(plan.schema_type).dataset_fields %}
+          {% for field in current_fields %}
             {% if dataset.get(field.field_name) %}
               <dt>{{ h.scheming_language_text(field.label) or field.field_name }}</dt>
               <dd>{{ dataset[field.field_name] }}</dd>
