@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from freezegun import freeze_time
 
+import ckan.plugins as p
 import ckan.plugins.toolkit as tk
 from ckan.lib.plugins import lookup_package_plugin
 from ckan.tests import helpers
@@ -188,6 +189,27 @@ class TestDynamicSchemaSync:
         SchemingSchemaVersion.create("group", "test-group", schema_definition)
 
         assert "test-group" not in tk.h.scheming_dataset_schemas()
+
+    def test_dynamic_schemas_survive_a_runtime_plugins_update(self, schema_definition):
+        """A runtime ``plugins_update()`` must not permanently drop DB schemas.
+
+        It resets the cached schemas to the file-defined set, so the
+        dynamic-schema merge must rerun rather than skip it on a stale
+        fingerprint.
+        """
+        helpers.call_action(
+            "scheming_schema_create",
+            schema_type="test-type",
+            definition=schema_definition,
+        )
+        assert "test-type" in tk.h.scheming_dataset_schemas()
+
+        p.plugins_update()
+
+        schemas = tk.h.scheming_dataset_schemas()
+        assert "test-type" in schemas
+        assert "dataset" in schemas
+        assert lookup_package_plugin("test-type") is SchemingDatasetsPlugin.instance
 
     def test_delete_then_create_at_the_same_instant_is_still_detected(
         self, schema_definition

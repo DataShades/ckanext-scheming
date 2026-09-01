@@ -1,7 +1,30 @@
 import pytest
 
 from ckanext.scheming.errors import SchemingException
-from ckanext.scheming.plugins import _expand_schemas
+from ckanext.scheming.plugins import _SchemingMixin, _expand_schemas
+
+
+class TestExpandReloadsPresets:
+    def test_expand_schemas_reloads_presets_when_cache_was_cleared(self):
+        # `plugins_update()` and `sync.reset()` null this cache for a lazy
+        # reload; `_expand_schemas` used to crash on the None instead of reloading.
+        _SchemingMixin._presets = None
+        try:
+            result = _expand_schemas(
+                {
+                    "test-type": {
+                        "dataset_type": "test-type",
+                        "dataset_fields": [
+                            {"field_name": "title", "preset": "title"}
+                        ],
+                    }
+                }
+            )
+        finally:
+            _SchemingMixin._presets = None
+
+        field = result["test-type"]["dataset_fields"][0]
+        assert field["form_snippet"] == "large_text.html"
 
 
 class TestRestrictToField:

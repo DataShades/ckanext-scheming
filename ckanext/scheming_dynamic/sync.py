@@ -176,7 +176,13 @@ def pinned_expanded_schema(
 
 
 def reset() -> None:
-    """Forget cached fingerprints/snapshots, for test isolation."""
+    """Drop every cached fingerprint/snapshot of the dynamic schemas.
+
+    The next read then re-merges the DB rows from scratch. Used for test
+    isolation, and by ``SchemingDatasetsPlugin.configure`` after a runtime
+    ``plugins_update()`` reloads the file schemas, so the fingerprint can't
+    skip the re-merge.
+    """
     _SchemingMixin.dynamic_scheming["schema"] = {
         "fingerprint": None,
         "pending_fingerprint": None,

@@ -426,6 +426,13 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
             c.licenses = [('', '')] + model.Package.get_license_options()
 
     def configure(self, config):
+        # A runtime `plugins_update()` reset the cached schemas; force
+        # `scheming_dynamic` to re-merge the DB schemas instead of trusting its
+        # stale change-detection fingerprint and dropping them until restart.
+        if p.plugin_loaded("scheming_dynamic"):
+            from ckanext.scheming_dynamic import sync # noqa
+            sync.reset()
+
         self._dataset_form_pages = _build_dataset_form_pages(
             self._expanded_schemas)
 
@@ -783,9 +790,12 @@ def _expand(schema, field, entity_type):
     """
     preset = field.get('preset')
     if preset:
-        if preset not in _SchemingMixin._presets:
+        # Use the accessor: `_SchemingMixin._presets` is transiently None after
+        # a `plugins_update()` / `sync.reset()` and only reloads on the next read.
+        presets = _SchemingMixin.get_presets(p.toolkit.config)
+        if preset not in presets:
             raise SchemingException('preset \'{}\' not defined'.format(preset))
-        preset_values = _SchemingMixin._presets[preset]
+        preset_values = presets[preset]
         field = dict(preset_values, **field)
         _check_preset_restrictions(preset, preset_values, field, entity_type)
 
