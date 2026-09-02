@@ -20,7 +20,6 @@ from flask import Blueprint
 from flask import url_for as flask_url_for
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session as SASession
-import sqlalchemy as sa
 from werkzeug.routing import BuildError
 
 import ckan.plugins.toolkit as tk
