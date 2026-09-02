@@ -19,6 +19,7 @@ from typing import Any
 from flask import Blueprint
 from flask import url_for as flask_url_for
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session as SASession
 from werkzeug.routing import BuildError
 
 import ckan.plugins.toolkit as tk
@@ -97,8 +98,8 @@ def _dynamic_schema_exists(package_type: str) -> bool:
         return True
 
     try:
-        with model.Session.begin_nested():
-            return SchemingSchemaVersion.head_version("dataset", package_type) > 0
+        with SASession(bind=model.meta.engine) as session:
+            return SchemingSchemaVersion.head_version("dataset", package_type, session=session) > 0
     except DBAPIError:
         return False
 

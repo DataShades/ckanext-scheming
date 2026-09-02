@@ -5,7 +5,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, Session as SASession
 from typing_extensions import Self  # noqa: UP035
 
 import ckan.plugins.toolkit as tk
@@ -163,10 +163,12 @@ class SchemingSchemaVersion(tk.BaseModel):
         return model.Session.get(cls, (entity_type, schema_type, version))
 
     @classmethod
-    def head_version(cls, entity_type: str, schema_type: str) -> int:
+    def head_version(cls, entity_type: str, schema_type: str, session: SASession | None = None) -> int:
         """Highest version number, or 0 if the schema doesn't exist yet."""
+        db_session = session or model.Session
+
         result = (
-            model.Session.query(sa.func.max(cls.version))
+            db_session.query(sa.func.max(cls.version))
             .filter(cls.entity_type == entity_type, cls.schema_type == schema_type)
             .scalar()
         )
