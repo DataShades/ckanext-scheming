@@ -165,10 +165,10 @@ class SchemingSchemaVersion(tk.BaseModel):
     @classmethod
     def head_version(cls, entity_type: str, schema_type: str, session: SASession | None = None) -> int:
         """Highest version number, or 0 if the schema doesn't exist yet."""
-        session = session or model.Session
+        db_session = session or model.Session
 
         result = (
-            model.Session.query(sa.func.max(cls.version))
+            db_session.query(sa.func.max(cls.version))
             .filter(cls.entity_type == entity_type, cls.schema_type == schema_type)
             .scalar()
         )
