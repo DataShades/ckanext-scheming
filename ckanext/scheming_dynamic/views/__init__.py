@@ -19,6 +19,7 @@ from typing import Any
 from flask import Blueprint
 from flask import url_for as flask_url_for
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session as SASession
 import sqlalchemy as sa
 from werkzeug.routing import BuildError
 
@@ -97,19 +98,9 @@ def _dynamic_schema_exists(package_type: str) -> bool:
     if package_type == getattr(tk.g, "scheming_dynamic_preview_type", None):
         return True
 
-    table = SchemingSchemaVersion.__table__
-    query = (
-        sa.select(table.c.version)
-        .where(
-            table.c.entity_type == "dataset",
-            table.c.schema_type == package_type,
-        )
-        .limit(1)
-    )
-
     try:
-        with model.meta.engine.connect() as connection:
-            return connection.execute(query).first() is not None
+        with SASession(bind=model.meta.engine) as session:
+            return SchemingSchemaVersion.head_version("dataset", package_type, session=session) > 0
     except DBAPIError:
         return False
 
