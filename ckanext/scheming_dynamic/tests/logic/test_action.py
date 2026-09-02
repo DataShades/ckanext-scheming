@@ -8,6 +8,7 @@ from ckan.tests import factories, helpers
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
     SchemingSchemaActivity,
+    SchemingSchemaPin,
     SchemingSchemaVersion,
 )
 from ckanext.scheming_dynamic.tests import factories as scheming_factories
@@ -253,6 +254,21 @@ class TestSchemingSchemaDelete:
             helpers.call_action("scheming_schema_delete", schema_type="test-type")
 
         assert SchemingSchemaVersion.head("dataset", "test-type")
+
+    def test_delete_clears_stale_pins_from_purged_datasets(self, schema_definition):
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
+        dataset = factories.Dataset(type="test-type")
+        assert SchemingSchemaPin.get("dataset", dataset["id"])
+
+        helpers.call_action("dataset_purge", id=dataset["id"])
+        # nothing removes the pin when its dataset is purged
+        assert SchemingSchemaPin.get("dataset", dataset["id"])
+
+        result = helpers.call_action("scheming_schema_delete", schema_type="test-type")
+
+        assert result is True
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 0
+        assert SchemingSchemaPin.get("dataset", dataset["id"]) is None
 
     def test_delete_unsupported_entity_type(self):
         with pytest.raises(tk.ValidationError, match="Value must be one of"):

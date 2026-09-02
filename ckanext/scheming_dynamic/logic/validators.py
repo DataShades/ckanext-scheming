@@ -87,6 +87,10 @@ def scheming_schema_not_in_use(
 ) -> Any:
     """Refuse to delete a schema while a package still uses its type.
 
+    Deleted (trashed) packages count too: they can be restored, and a
+    restored package with no schema to render against is broken. The caller
+    must purge them first.
+
     TODO: Only "dataset" dynamic schemas are supported for now.
     """
     schema_type = data[key]

@@ -234,12 +234,19 @@ class SchemingSchemaVersion(tk.BaseModel):
     def delete_all(cls, entity_type: str, schema_type: str) -> None:
         """Delete every version row for schema_type (the entire schema).
 
-        Callers should already have confirmed nothing is pinned to this
-        schema_type (the create/update/delete actions do, via the
-        ``scheming_schema_not_in_use`` validator). If something still is,
-        ``SchemingSchemaPin``'s FK acts as a backstop and this raises
-        IntegrityError instead of silently orphaning the pin.
+        Callers should already have confirmed no live entity still uses
+        this schema_type (the create/update/delete actions do, via the
+        ``scheming_schema_not_in_use`` validator). Pin rows can nonetheless
+        outlive their entity -- nothing removes a pin when its dataset is
+        purged -- so any pin to this schema_type is a stale leftover by the
+        time we get here. Clear those first: they'd otherwise trip
+        ``SchemingSchemaPin``'s FK and abort the delete with an
+        IntegrityError.
         """
+        model.Session.query(SchemingSchemaPin).filter(
+            SchemingSchemaPin.entity_type == entity_type,
+            SchemingSchemaPin.schema_type == schema_type,
+        ).delete()
         model.Session.query(cls).filter(
             cls.entity_type == entity_type, cls.schema_type == schema_type
         ).delete()

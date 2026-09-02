@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import ckan.plugins.toolkit as tk
-from ckan.tests import factories
+from ckan.tests import factories, helpers
 
 from ckanext.scheming_dynamic.logic.validators import (
     scheming_definition_valid,
@@ -58,6 +58,13 @@ class TestSchemingSchemaNotInUse:
 
     def test_raises_invalid_when_package_of_type_exists(self):
         factories.Dataset(type="test-type")
+
+        with pytest.raises(tk.Invalid, match="still exist"):
+            self._call_not_in_use_validator("dataset", "test-type")
+
+    def test_raises_invalid_when_only_a_trashed_package_of_type_exists(self):
+        dataset = factories.Dataset(type="test-type")
+        helpers.call_action("package_delete", id=dataset["id"])
 
         with pytest.raises(tk.Invalid, match="still exist"):
             self._call_not_in_use_validator("dataset", "test-type")

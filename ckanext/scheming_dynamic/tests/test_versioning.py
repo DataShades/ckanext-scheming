@@ -154,6 +154,29 @@ class TestSchemaVersioning:
         assert shown.get("temporal_coverage", "") == ""
 
 
+class TestSchemaPinLifecycle:
+    def test_deleting_a_package_removes_its_pin(self, schema_definition):
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
+        dataset = factories.Dataset(type="test-type")
+        assert SchemingSchemaPin.get("dataset", dataset["id"])
+
+        helpers.call_action("package_delete", id=dataset["id"])
+
+        assert SchemingSchemaPin.get("dataset", dataset["id"]) is None
+
+    def test_schema_can_be_deleted_once_its_packages_are_purged(
+        self, schema_definition
+    ):
+        SchemingSchemaVersion.create("dataset", "test-type", schema_definition)
+        dataset = factories.Dataset(type="test-type")
+
+        helpers.call_action("dataset_purge", id=dataset["id"])
+        helpers.call_action("scheming_schema_delete", schema_type="test-type")
+
+        assert SchemingSchemaVersion.head_version("dataset", "test-type") == 0
+        assert SchemingSchemaPin.get("dataset", dataset["id"]) is None
+
+
 class TestSchemingSchemaActivityList:
     def test_returns_history_oldest_first(self, schema_definition):
         helpers.call_action("scheming_schema_create", definition=schema_definition)
