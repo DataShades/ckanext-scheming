@@ -10,6 +10,8 @@ from ckan.common import CKANConfig
 from ckanext.scheming_dynamic import views
 from ckanext.scheming_dynamic.cli import get_commands
 from ckanext.scheming_dynamic.utils import ensure_pinned, remove_pin
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
+from ckanext.scheming_dynamic.utils import ensure_pinned
 
 
 @tk.blanket.actions

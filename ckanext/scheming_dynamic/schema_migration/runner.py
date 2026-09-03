@@ -12,7 +12,7 @@ from ckanext.scheming_dynamic.schema_migration import diff
 from ckanext.scheming_dynamic.schema_migration import mapping as mapping_lib
 from ckanext.scheming_dynamic.schema_migration.apply import (
     Migrator,
-    datasets_at_version,
+    entities_at_version,
     expanded_definition,
 )
 from ckanext.scheming_dynamic.schema_migration.model import (
@@ -86,30 +86,32 @@ def refuse_while_running(
         )
 
 
-def start(  # noqa: PLR0913
+def start(  # noqa: PLR0913 PLR0917
     schema_type: str,
+    entity_type: str,
     from_version: int,
     to_version: int,
     mapping: dict[str, Any],
     actor: str,
     dry_run: bool = False,
 ) -> MigrationRun:
-    """Record a pending bulk run over every dataset pinned to ``from_version``."""
+    """Record a pending bulk run over every entity pinned to ``from_version``."""
     return MigrationRun.create(
-        entity_type=Migrator.entity_type,
+        entity_type=entity_type,
         schema_type=schema_type,
         from_version=from_version,
         to_version=to_version,
         mapping_used=mapping,
         status=MigrationRun.PENDING,
         dry_run=dry_run,
-        total=len(datasets_at_version(schema_type, from_version)),
+        total=len(entities_at_version(entity_type, schema_type, from_version)),
         actor=actor,
     )
 
 
-def enqueue(  # noqa: PLR0913
+def enqueue(  # noqa: PLR0913 PLR0917
     schema_type: str,
+    entity_type: str,
     from_version: int,
     to_version: int,
     mapping: dict[str, Any],
@@ -117,7 +119,9 @@ def enqueue(  # noqa: PLR0913
     dry_run: bool = False,
 ) -> MigrationRun:
     """Queue a bulk run for a background worker to pick up."""
-    run = start(schema_type, from_version, to_version, mapping, actor, dry_run)
+    run = start(
+        schema_type, entity_type, from_version, to_version, mapping, actor, dry_run
+    )
 
     tk.enqueue_job(
         execute,
@@ -147,7 +151,9 @@ def execute(run_id: str, progress: Callable[[int], Any] | None = None) -> None:
         run.finish(MigrationRun.FAILED, str(e))
         return
 
-    for entity_id in datasets_at_version(run.schema_type, run.from_version):
+    for entity_id in entities_at_version(
+        run.entity_type, run.schema_type, run.from_version
+    ):
         model.Session.refresh(run)
         if run.status == MigrationRun.CANCELLED:
             run.finish(MigrationRun.CANCELLED)
@@ -161,8 +167,9 @@ def execute(run_id: str, progress: Callable[[int], Any] | None = None) -> None:
     run.finish(MigrationRun.FINISHED)
 
 
-def run_single(  # noqa: PLR0913
+def run_single(  # noqa: PLR0913 PLR0917
     schema_type: str,
+    entity_type: str,
     from_version: int,
     to_version: int,
     mapping: dict[str, Any],
@@ -170,12 +177,14 @@ def run_single(  # noqa: PLR0913
     entity_id: str,
     dry_run: bool = False,
 ) -> MigrationRun:
-    """Migrate one dataset now, recording it as an already-finished run."""
-    migrator = Migrator(schema_type, from_version, to_version, mapping, actor, dry_run)
+    """Migrate one entity now, recording it as an already-finished run."""
+    migrator = Migrator(
+        schema_type, entity_type, from_version, to_version, mapping, actor, dry_run
+    )
     result = migrator.run_one(entity_id)
 
     run = MigrationRun.create(
-        entity_type=Migrator.entity_type,
+        entity_type=entity_type,
         schema_type=schema_type,
         from_version=from_version,
         to_version=to_version,
@@ -222,6 +231,7 @@ def record(run: MigrationRun, migrator: Migrator, entity_id: str) -> None:
 def _migrator(run: MigrationRun) -> Migrator:
     return Migrator(
         run.schema_type,
+        run.entity_type,
         run.from_version,
         run.to_version,
         run.mapping_used,

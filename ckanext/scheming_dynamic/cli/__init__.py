@@ -22,6 +22,7 @@ from ckanext.scheming_dynamic.cli.cli_utils import (
     site_user_context,
 )
 from ckanext.scheming_dynamic.cli.migration import migration
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.model import (
     SchemingSchemaPin,
     SchemingSchemaVersion,
@@ -182,7 +183,7 @@ def sync(ctx: click.Context, entity_type: str, schema_type: str):
     help="Report what would be pinned/fail without actually pinning anything.",
 )
 @click.pass_context
-def pin(  # noqa: PLR0913
+def pin(
     ctx: click.Context,
     entity_type: str,
     schema_type: str,
@@ -279,7 +280,7 @@ def _validation_failed(
 def _static_schema(entity_type: str, schema_type: str) -> dict[str, Any] | None:
     """The file-defined (pre-database-overlay) schema for entity/schema type."""
     plugin_class = {
-        "dataset": SchemingDatasetsPlugin,
+        DEFAULT_ENTITY_TYPE: SchemingDatasetsPlugin,
         "group": SchemingGroupsPlugin,
         "organization": SchemingOrganizationsPlugin,
     }[entity_type]
@@ -291,17 +292,15 @@ def _static_schema(entity_type: str, schema_type: str) -> dict[str, Any] | None:
             f"No scheming plugin for '{entity_type}' entities is loaded"
         )
 
-    # only SchemingDatasetsPlugin overlays the database onto ``_schemas``;
-    # for group/organization ``_schemas`` is still file-only (see README's
-    # "Known limitations").
-    static = instance._static_schemas if entity_type == "dataset" else instance._schemas
-    return static.get(schema_type)
+    # ``_static_schemas`` is the file-defined definition, before the database
+    # overlay (all three plugins keep it via _DynamicSchemaSyncMixin).
+    return instance._static_schemas.get(schema_type)
 
 
 def _unpinned_entities(
     entity_type: str, schema_type: str
 ) -> Iterator[model.Package | model.Group]:
-    if entity_type == "dataset":
+    if entity_type == DEFAULT_ENTITY_TYPE:
         entity_model = model.Package
         filters = [model.Package.type == schema_type]
     else:
@@ -328,7 +327,7 @@ class Validator:
         self.schema_type = schema_type
         self.user = user
 
-        if entity_type == "dataset":
+        if entity_type == DEFAULT_ENTITY_TYPE:
             self.plugin = lib_plugins.lookup_package_plugin(schema_type)
             self._dictize_func = model_dictize.package_dictize
             self._show_schema = self.plugin.show_package_schema

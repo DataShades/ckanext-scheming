@@ -11,6 +11,7 @@ import ckan.plugins.toolkit as tk
 from ckan import model
 from ckan.logic import validate
 
+from ckanext.scheming_dynamic.const import ENTITY_TYPES, TYPE_FIELDS
 from ckanext.scheming_dynamic.logic import schema
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
@@ -49,14 +50,16 @@ def scheming_schema_create(context: Any, data_dict: dict[str, Any]) -> dict[str,
     entity_type = data_dict["entity_type"]
     definition = data_dict["definition"]
 
-    schema_type = definition[schema.TYPE_FIELDS[entity_type]]
+    schema_type = definition[TYPE_FIELDS[entity_type]]
 
     if SchemingSchemaVersion.head_version(entity_type, schema_type):
         raise tk.ValidationError(
             {"schema_type": [tk._(f"Schema for '{schema_type}' already exists")]}
         )
 
-    _check_schema_renders(schema_type, definition)
+    _check_schema_type_not_reserved(entity_type, schema_type)
+    _check_schema_type_not_claimed_elsewhere(entity_type, schema_type)
+    _check_schema_renders(entity_type, schema_type, definition)
 
     # locked first: the activity row's FK needs version 1 to already exist
     row = SchemingSchemaVersion.lock(entity_type, schema_type, definition)
@@ -96,7 +99,7 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
     if not head:
         raise tk.ObjectNotFound(tk._(f"Schema for '{schema_type}' not found"))
 
-    type_field = schema.TYPE_FIELDS[entity_type]
+    type_field = TYPE_FIELDS[entity_type]
     if definition[type_field] != schema_type:
         raise tk.ValidationError(
             {
@@ -106,7 +109,7 @@ def scheming_schema_update(context: Any, data_dict: dict[str, Any]) -> dict[str,
             }
         )
 
-    _check_schema_renders(schema_type, definition)
+    _check_schema_renders(entity_type, schema_type, definition)
 
     row = _lock_or_sync_version(entity_type, schema_type, definition, head)
 
@@ -204,8 +207,64 @@ def scheming_schema_activity_list(
     ]
 
 
-def _check_schema_renders(schema_type: str, definition: dict[str, Any]) -> None:
-    """Raise ValidationError if a dataset schema's form can't render.
+def _check_schema_type_not_reserved(entity_type: str, schema_type: str) -> None:
+    """Refuse "dataset"/"group"/"organization" for a different entity_type.
+
+    CKAN always serves those names through its own built-in, statically
+    registered blueprint for the matching entity type -- ahead of both of
+    scheming_dynamic's catch-all blueprints -- regardless of whether a
+    dynamic schema exists. A schema using one of those names for a
+    different entity_type would be created successfully but have no URL
+    that could ever reach it.
+    """
+    if schema_type in ENTITY_TYPES and schema_type != entity_type:
+        raise tk.ValidationError(
+            {
+                "schema_type": [
+                    tk._(
+                        "'{schema_type}' is reserved for entity_type "
+                        "'{schema_type}'; it can't be used for entity_type "
+                        "'{entity_type}'"
+                    ).format(schema_type=schema_type, entity_type=entity_type)
+                ]
+            }
+        )
+
+
+def _check_schema_type_not_claimed_elsewhere(
+    entity_type: str, schema_type: str
+) -> None:
+    """Refuse a schema_type already live under a different entity_type.
+
+    The dataset and group/organization catch-all blueprints match on the
+    same URL shape (a single dynamic path segment), so a live schema_type
+    under one entity_type shadows -- and makes unreachable through the web
+    UI -- the same name under another.
+    """
+    for other_entity_type in ENTITY_TYPES:
+        if other_entity_type == entity_type:
+            continue
+        if SchemingSchemaVersion.head_version(other_entity_type, schema_type):
+            raise tk.ValidationError(
+                {
+                    "schema_type": [
+                        tk._(
+                            "'{schema_type}' is already used by entity_type "
+                            "'{other_entity_type}'; schema_type must be "
+                            "unique across entity types"
+                        ).format(
+                            schema_type=schema_type,
+                            other_entity_type=other_entity_type,
+                        )
+                    ]
+                }
+            )
+
+
+def _check_schema_renders(
+    entity_type: str, schema_type: str, definition: dict[str, Any]
+) -> None:
+    """Raise ValidationError if a schema's form can't render.
 
     Mirrors the /preview check, so a schema broken the same way can't be
     saved through the create/update actions either.
@@ -223,7 +282,7 @@ def _check_schema_renders(schema_type: str, definition: dict[str, Any]) -> None:
 
     with ctx:
         try:
-            render_schema_form(schema_type, definition)
+            render_schema_form(entity_type, schema_type, definition)
         except Exception as e:  # noqa: BLE001
             raise tk.ValidationError(
                 {"definition": [tk._("Schema cannot be rendered: {}").format(e)]}
@@ -523,6 +582,7 @@ def scheming_migration_apply(context: Any, data_dict: dict[str, Any]) -> dict[st
     if entity_id:
         run = runner.run_single(
             schema_type,
+            entity_type,
             from_version,
             to_version,
             mapping,
@@ -533,6 +593,7 @@ def scheming_migration_apply(context: Any, data_dict: dict[str, Any]) -> dict[st
     else:
         run = runner.enqueue(
             schema_type,
+            entity_type,
             from_version,
             to_version,
             mapping,

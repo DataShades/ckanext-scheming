@@ -72,8 +72,12 @@ class _SchemingMixin(object):
     _schemas = tuple()
     _expanded_schemas = tuple()
 
-    dynamic_scheming: dict[str, dict[str, Any]] = {
-        "schema": {"fingerprint": None, "pending_fingerprint": None},
+    dynamic_scheming: dict[str, Any] = {
+        "schema": {
+            "dataset": {"fingerprint": None, "pending_fingerprint": None},
+            "group": {"fingerprint": None, "pending_fingerprint": None},
+            "organization": {"fingerprint": None, "pending_fingerprint": None},
+        },
         "preset": {"fingerprint": None, "static": None},
     }
 
@@ -145,13 +149,113 @@ class _SchemingMixin(object):
         return self._is_fallback
 
 
+class _DynamicSchemaSyncMixin:
+    """
+    Overlay database-stored (ckanext-scheming-dynamic) schemas onto the
+    file-defined ones at runtime, without a server restart.
+
+    Shared by the dataset, group and organization plugins. Subclasses set
+    ``SCHEMA_ENTITY_TYPE`` and may override ``_after_dynamic_sync`` to run
+    entity-type-specific bookkeeping (form pages, blueprint/plugin
+    registration) whenever the merged schemas change.
+    """
+    SCHEMA_ENTITY_TYPE = "dataset"
+
+    _static_schemas = {}
+    _schemas_value = {}
+    _expanded_value = {}
+
+    @property
+    def _schemas(self):
+        self._sync_dynamic_schemas()
+        return self._schemas_value
+
+    @_schemas.setter
+    def _schemas(self, value):
+        # keep the file-defined schemas around: they are the base the
+        # dynamic database schemas get merged over
+        self._static_schemas = value
+        self._schemas_value = value
+
+    @property
+    def _expanded_schemas(self):
+        self._sync_dynamic_schemas()
+        return self._expanded_value
+
+    @_expanded_schemas.setter
+    def _expanded_schemas(self, value):
+        self._expanded_value = value
+
+    def _sync_dynamic_schemas(self):
+        """Reload schemas when the scheming_dynamic database changed.
+
+        A no-op unless the ``scheming_dynamic`` plugin is loaded.
+        """
+        if not p.plugin_loaded("scheming_dynamic"):
+            return
+
+        from ckanext.scheming_dynamic import sync  # noqa
+
+        merged = sync.schemas_if_changed(
+            self.SCHEMA_ENTITY_TYPE, self._static_schemas)
+        if merged is None:
+            return
+
+        try:
+            expanded = _expand_schemas(merged)
+        except Exception:
+            log.exception(
+                "unable to expand dynamic %s schemas, keeping the previous ones",
+                self.SCHEMA_ENTITY_TYPE)
+            return
+
+        sync.confirm_applied(self.SCHEMA_ENTITY_TYPE)
+        self._schemas_value = merged
+        self._expanded_value = expanded
+        self._after_dynamic_sync(merged, expanded)
+
+    def _after_dynamic_sync(self, merged, expanded):
+        """Hook: run whenever the merged schemas change. Overridden below."""
+
+
 class _GroupOrganizationMixin(object):
     """
     Common methods for SchemingGroupsPlugin and SchemingOrganizationsPlugin
     """
 
+    is_organization = False
+
     def group_types(self):
         return list(self._schemas)
+
+    def _after_dynamic_sync(self, merged, expanded):
+        self._register_dynamic_group_types(merged)
+
+    def _register_dynamic_group_types(self, schemas):
+        """Keep runtime-created group/organization types resolvable.
+
+        ``ckan.lib.plugins.lookup_group_plugin`` reads a dict populated once
+        at startup from every ``IGroupForm.group_types()``. A type added to
+        the database afterwards is missing from it, so lookups for it fall
+        back to the default group/organization form instead of us. Fill in
+        the missing entries here and drop the ones for types later deleted
+        from the database (mirrors ``_register_dynamic_package_types``).
+        """
+        controller = "organization" if self.is_organization else "group"
+        current_types = set(schemas)
+
+        for group_type in current_types:
+            lib_plugins._group_plugins.setdefault(group_type, self)  # type: ignore
+            lib_plugins._group_controllers.setdefault(group_type, controller)  # type: ignore
+
+        stale = [
+            group_type
+            for group_type, plugin in lib_plugins._group_plugins.items()
+            if plugin is self and group_type not in current_types
+        ]
+        for group_type in stale:
+            del lib_plugins._group_plugins[group_type]
+            lib_plugins._group_controllers.pop(group_type, None)
 
     def setup_template_variables(self, context, data_dict):
         group_type = data_dict.get('type')
@@ -171,6 +275,17 @@ class _GroupOrganizationMixin(object):
             return data_dict, {'type': "Unsupported {thing} type: {t}".format(
                 thing=thing, t=t)}
         scheming_schema = self._expanded_schemas[t]
+
+        if action_type in ('update', 'show') and p.plugin_loaded(
+                'scheming_dynamic'):
+            from ckanext.scheming_dynamic import sync  # noqa
+            entity_type = (
+                'organization' if self.is_organization else 'group')
+            pinned = sync.pinned_expanded_schema(
+                entity_type, t, data_dict.get('id'))
+            if pinned:
+                scheming_schema = pinned
+
         scheming_fields = scheming_schema['fields']
 
         before = scheming_schema.get('before_validators')
@@ -198,7 +313,7 @@ class _GroupOrganizationMixin(object):
 
 
 class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
-                             _SchemingMixin):
+                             _DynamicSchemaSyncMixin, _SchemingMixin):
     p.implements(p.IConfigurer)
     p.implements(p.IConfigurable)
     p.implements(p.ITemplateHelpers)
@@ -209,63 +324,13 @@ class SchemingDatasetsPlugin(p.SingletonPlugin, DefaultDatasetForm,
     SCHEMA_OPTION = 'scheming.dataset_schemas'
     FALLBACK_OPTION = 'scheming.dataset_fallback'
     SCHEMA_TYPE_FIELD = 'dataset_type'
-
-    _static_schemas = {}
-    _schemas_value = {}
-    _expanded_value = {}
+    SCHEMA_ENTITY_TYPE = 'dataset'
 
     @classmethod
     def _store_instance(cls, self):
         SchemingDatasetsPlugin.instance = self
 
-    @property
-    def _schemas(self):
-        self._sync_dynamic_schemas()
-        return self._schemas_value
-
-    @_schemas.setter
-    def _schemas(self, value):
-        # keep the file-defined schemas around: they are the base the
-        # dynamic database schemas get merged over
-        self._static_schemas = value
-        self._schemas_value = value
-
-    @property
-    def _expanded_schemas(self):
-        self._sync_dynamic_schemas()
-        return self._expanded_value
-
-    @_expanded_schemas.setter
-    def _expanded_schemas(self, value: dict[str, Any]) -> None:
-        self._expanded_value = value
-
-    def _sync_dynamic_schemas(self):
-        """Sync dynamic schemas with the database.
-
-        Reload dataset schemas when the scheming_dynamic database table
-        changed since the last merge, so schema edits show up without a
-        server restart.
-        """
-        if not p.plugin_loaded('scheming_dynamic'):
-            return
-
-        from ckanext.scheming_dynamic import sync # noqa
-
-        merged = sync.dataset_schemas_if_changed(self._static_schemas)
-        if merged is None:
-            return
-
-        try:
-            expanded = _expand_schemas(merged)
-        except Exception:
-            log.exception(
-                'unable to expand dynamic dataset schemas, '
-                'keeping the previous ones')
-            return
-
-        sync.confirm_applied()
-        self._schemas_value = merged
-        self._expanded_value = expanded
+    def _after_dynamic_sync(self, merged, expanded):
         self._dataset_form_pages = _build_dataset_form_pages(expanded)
         self._register_dynamic_package_types(merged)
 
@@ -519,7 +584,8 @@ def expand_form_composite(data, schema):
 
 
 class SchemingGroupsPlugin(p.SingletonPlugin, _GroupOrganizationMixin,
-                           DefaultGroupForm, _SchemingMixin):
+                           DefaultGroupForm, _DynamicSchemaSyncMixin,
+                           _SchemingMixin):
     p.implements(p.IConfigurer)
     p.implements(p.ITemplateHelpers)
     p.implements(p.IGroupForm, inherit=True)
@@ -529,6 +595,7 @@ class SchemingGroupsPlugin(p.SingletonPlugin, _GroupOrganizationMixin,
     SCHEMA_OPTION = 'scheming.group_schemas'
     FALLBACK_OPTION = 'scheming.group_fallback'
     SCHEMA_TYPE_FIELD = 'group_type'
+    SCHEMA_ENTITY_TYPE = 'group'
     UNSPECIFIED_GROUP_TYPE = 'group'
 
     @classmethod
@@ -549,7 +616,8 @@ class SchemingGroupsPlugin(p.SingletonPlugin, _GroupOrganizationMixin,
 
 
 class SchemingOrganizationsPlugin(p.SingletonPlugin, _GroupOrganizationMixin,
-                                  DefaultOrganizationForm, _SchemingMixin):
+                                  DefaultOrganizationForm,
+                                  _DynamicSchemaSyncMixin, _SchemingMixin):
     p.implements(p.IConfigurer)
     p.implements(p.ITemplateHelpers)
     p.implements(p.IGroupForm, inherit=True)
@@ -559,6 +627,7 @@ class SchemingOrganizationsPlugin(p.SingletonPlugin, _GroupOrganizationMixin,
     SCHEMA_OPTION = 'scheming.organization_schemas'
     FALLBACK_OPTION = 'scheming.organization_fallback'
     SCHEMA_TYPE_FIELD = 'organization_type'
+    SCHEMA_ENTITY_TYPE = 'organization'
     UNSPECIFIED_GROUP_TYPE = 'organization'
 
     is_organization = True

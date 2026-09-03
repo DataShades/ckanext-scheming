@@ -25,21 +25,27 @@ from ckanext.scheming_dynamic.schema_migration.diff import (
     FIELD_GROUPS,
     MANUAL,
     GroupDiff,
+    groups_in,
 )
 
 ACTIONS = (COPY, CONSTANT, DEFAULT, DROP, MANUAL)
 
 
-def empty() -> dict[str, Any]:
+def _mapping_groups(mapping: dict[str, Any]) -> tuple[str, ...]:
+    groups = tuple(g for g in mapping if g != "dropped")
+    return groups or FIELD_GROUPS
+
+
+def empty(groups: tuple[str, ...] = FIELD_GROUPS) -> dict[str, Any]:
     return {
-        **{group: {} for group in FIELD_GROUPS},
-        "dropped": {group: [] for group in FIELD_GROUPS},
+        **{group: {} for group in groups},
+        "dropped": {group: [] for group in groups},
     }
 
 
 def suggest(diff: dict[str, GroupDiff]) -> dict[str, Any]:
     """Auto-derive entries for every field that does not need a decision."""
-    mapping = empty()
+    mapping = empty(tuple(diff) or FIELD_GROUPS)
 
     for group, group_diff in diff.items():
         for change in group_diff.fields:
@@ -52,11 +58,12 @@ def suggest(diff: dict[str, GroupDiff]) -> dict[str, Any]:
 
 def overlay_values(mapping: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
     """Answer a mapping's open questions for one dataset with literal values."""
-    merged = {group: dict(mapping.get(group, {})) for group in FIELD_GROUPS}
+    groups = _mapping_groups(mapping)
+    merged = {group: dict(mapping.get(group, {})) for group in groups}
     merged["dropped"] = mapping.get("dropped", {})
 
     for group, group_values in values.items():
-        if group not in FIELD_GROUPS:
+        if group not in groups:
             continue
         for field_name, value in group_values.items():
             merged[group][field_name] = {"action": CONSTANT, "value": value}
@@ -104,7 +111,7 @@ def manual_fields(mapping: dict[str, Any]) -> list[dict[str, str]]:
     """Fields deferred to the guided per-dataset form, so bulk cannot answer them."""
     return [
         _problem(group, field_name, "answered per dataset, not in bulk")
-        for group in FIELD_GROUPS
+        for group in _mapping_groups(mapping)
         for field_name, entry in mapping.get(group, {}).items()
         if entry.get("action") == MANUAL
     ]
@@ -114,7 +121,7 @@ def check(mapping: dict[str, Any], target: dict[str, Any]) -> list[str]:
     """Structural errors in a mapping, independent of any particular dataset."""
     errors = []
 
-    for group in FIELD_GROUPS:
+    for group in groups_in(target):
         target_fields = {f["field_name"]: f for f in target.get(group, [])}
 
         for field_name, entry in mapping.get(group, {}).items():

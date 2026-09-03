@@ -10,6 +10,7 @@ import ckan.plugins.toolkit as tk
 from ckan import model
 
 from ckanext.scheming.plugins import _expand_schemas, _SchemingMixin
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE, ENTITY_TYPES
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
     SchemingSchemaPin,
@@ -30,33 +31,39 @@ SCHEMA_CHECKED_FLAG = "scheming_dynamic_schema_checked"
 PRESET_CHECKED_FLAG = "scheming_dynamic_preset_checked"
 
 
-def dataset_schemas_if_changed(
+def _schema_checked_flag(entity_type: str) -> str:
+    return f"{SCHEMA_CHECKED_FLAG}_{entity_type}"
+
+
+def schemas_if_changed(
+    entity_type: str,
     static_schemas: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Return a copy of ``static_schemas`` overlaid with the database schemas.
 
-    When the database changed since the last call, all dataset schemas are
-    rebuilt from the file-defined ones overlaid with the database rows. The
-    check runs at most once per request and once per worker process, which is
-    how changes made in one worker propagate to the others.
+    When the database changed since the last call, all schemas of
+    ``entity_type`` are rebuilt from the file-defined ones overlaid with the
+    database rows. The check runs at most once per request and once per
+    worker process, which is how changes made in one worker propagate to the
+    others.
 
     The fingerprint is only advanced once the caller confirms the merged
     schemas were applied successfully (see ``confirm_applied``) — otherwise a
     schema that fails to expand would never be retried until some unrelated
     write bumped the fingerprint again.
     """
-    if _checked_in_this_request(SCHEMA_CHECKED_FLAG):
+    if _checked_in_this_request(_schema_checked_flag(entity_type)):
         return None
 
-    # dataset fields can reference DB-defined presets: their expansion below
+    # fields can reference DB-defined presets: their expansion below
     # needs _SchemingMixin._presets to be current first.
     ensure_presets_synced()
 
-    state = _SchemingMixin.dynamic_scheming["schema"]
+    state = _SchemingMixin.dynamic_scheming["schema"][entity_type]
     preset_fingerprint = _SchemingMixin.dynamic_scheming["preset"]["fingerprint"]
 
     try:
-        fingerprint = (SchemingState.fingerprint("dataset"), preset_fingerprint)
+        fingerprint = (SchemingState.fingerprint(entity_type), preset_fingerprint)
     except (DBAPIError, UnboundExecutionError):
         model.Session.rollback()
         log.debug("cannot read the scheming_state table")
@@ -67,7 +74,7 @@ def dataset_schemas_if_changed(
 
     merged = dict(static_schemas)
 
-    for row in SchemingSchemaVersion.get_heads_of_type(entity_type="dataset"):
+    for row in SchemingSchemaVersion.get_heads_of_type(entity_type=entity_type):
         merged[row.schema_type] = row.definition
 
     state["pending_fingerprint"] = fingerprint
@@ -75,17 +82,17 @@ def dataset_schemas_if_changed(
     return merged
 
 
-def confirm_applied() -> None:
+def confirm_applied(entity_type: str = DEFAULT_ENTITY_TYPE) -> None:
     """Confirm a successful sync of the dynamic schemas.
 
-    Record that the schemas from the last ``dataset_schemas_if_changed``
-    call were successfully applied, so that unchanged database state isn't
-    re-merged on the next check.
+    Record that the schemas from the last ``schemas_if_changed`` call were
+    successfully applied, so that unchanged database state isn't re-merged on
+    the next check.
 
     Must not be called after a failed merge: the fingerprint would advance
     without the failing schema ever being retried.
     """
-    state = _SchemingMixin.dynamic_scheming["schema"]
+    state = _SchemingMixin.dynamic_scheming["schema"][entity_type]
     state["fingerprint"] = state["pending_fingerprint"]
 
 
@@ -98,11 +105,10 @@ def get_static_presets() -> dict[str, dict[str, Any]]:
 def ensure_presets_synced() -> None:
     """Overlay the database presets onto ``_SchemingMixin._presets``.
 
-    Mirrors ``dataset_schemas_if_changed``: runs at most once per
-    request/worker check, keyed off the ``scheming_state`` row for the
-    "preset" key. A preset whose base chain fails to resolve
-    (cycle or missing base) is dropped and logged rather than breaking
-    every other preset.
+    Mirrors ``schemas_if_changed``: runs at most once per request/worker
+    check, keyed off the ``scheming_state`` row for the "preset" key. A
+    preset whose base chain fails to resolve (cycle or missing base) is
+    dropped and logged rather than breaking every other preset.
     """
     if _checked_in_this_request(PRESET_CHECKED_FLAG):
         return
@@ -184,8 +190,8 @@ def reset() -> None:
     skip the re-merge.
     """
     _SchemingMixin.dynamic_scheming["schema"] = {
-        "fingerprint": None,
-        "pending_fingerprint": None,
+        entity_type: {"fingerprint": None, "pending_fingerprint": None}
+        for entity_type in ENTITY_TYPES
     }
     _SchemingMixin.dynamic_scheming["preset"] = {"fingerprint": None, "static": None}
     _SchemingMixin._presets = None
@@ -201,7 +207,8 @@ def forget_request_check() -> None:
     if not has_request_context():
         return
 
-    g.pop(SCHEMA_CHECKED_FLAG, None)
+    for entity_type in ENTITY_TYPES:
+        g.pop(_schema_checked_flag(entity_type), None)
     g.pop(PRESET_CHECKED_FLAG, None)
 
 

@@ -21,6 +21,7 @@
         <tr>
           <th>{{ _('Started') }}</th>
           <th>{{ _('Schema') }}</th>
+          <th>{{ _('Entity type') }}</th>
           <th>{{ _('Versions') }}</th>
           <th>{{ _('Status') }}</th>
           <th>{{ _('Result') }}</th>
@@ -36,6 +37,7 @@
               </a>
             </td>
             <td>{{ run.schema_type }}</td>
+            <td>{{ run.entity_type }}</td>
             <td>v{{ run.from_version }} &rarr; v{{ run.to_version }}</td>
             <td>
               {% snippet 'scheming_dynamic/migration/snippets/run_status.html', run=run %}
@@ -56,7 +58,7 @@
   {% endif %}
 
   <div class="form-actions">
-    <a class="btn btn-secondary" href="{% url_for 'scheming_dynamic_migration.index' %}">
+    <a class="btn btn-secondary" href="{{ h.url_for('scheming_dynamic_migration.index') }}">
       {{ _('Back') }}
     </a>
   </div>

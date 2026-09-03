@@ -91,7 +91,7 @@ class TestAdminAccess:
         )
 
         assert resp.status_code == STATUS_OK
-        assert "Dataset schemas" in resp.body
+        assert "Dynamic schemas" in resp.body
 
     def test_sysadmin_sees_the_presets_listing(self, app):
         resp = app.get(

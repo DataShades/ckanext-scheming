@@ -9,6 +9,7 @@ import click
 import ckan.plugins.toolkit as tk
 from ckan import types
 
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
 from ckanext.scheming_dynamic.schema import SCHEMA_CLASSES
 
 entity_type_option = click.option(
@@ -16,7 +17,7 @@ entity_type_option = click.option(
     "--type",
     "entity_type",
     type=click.Choice(sorted(SCHEMA_CLASSES)),
-    default="dataset",
+    default=DEFAULT_ENTITY_TYPE,
     show_default=True,
     help="Which ckanext-scheming schema shape to build/validate against.",
 )

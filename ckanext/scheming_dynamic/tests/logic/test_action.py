@@ -65,18 +65,89 @@ class TestSchemingSchemaCreate:
                 definition=schema_definition,
             )
 
-    def test_unserved_entity_type_is_rejected(self):
-        # group/organization schemas aren't merged or routed yet
-        with pytest.raises(tk.ValidationError):
+    @pytest.mark.parametrize(
+        ("entity_type", "type_field"),
+        [("group", "group_type"), ("organization", "organization_type")],
+    )
+    def test_group_and_organization_schemas_can_be_created(
+        self, entity_type, type_field
+    ):
+        result = helpers.call_action(
+            "scheming_schema_create",
+            entity_type=entity_type,
+            definition={
+                "about": "Example schema",
+                type_field: entity_type,
+                "fields": [{"field_name": "title"}],
+            },
+        )
+
+        assert result["entity_type"] == entity_type
+        assert result["schema_type"] == entity_type
+        assert result["version"] == 1
+        assert SchemingSchemaVersion.head(entity_type, entity_type)
+
+    @pytest.mark.parametrize(
+        ("entity_type", "type_field", "schema_type"),
+        [
+            ("group", "group_type", "dataset"),
+            ("group", "group_type", "organization"),
+            ("organization", "organization_type", "dataset"),
+            ("organization", "organization_type", "group"),
+        ],
+    )
+    def test_reserved_type_name_for_wrong_entity_type_is_rejected(
+        self, entity_type, type_field, schema_type
+    ):
+        # "dataset"/"group"/"organization" are always served by CKAN's own
+        # built-in blueprint for the matching entity type, ahead of the
+        # dynamic catch-alls -- using one for a different entity_type would
+        # create a schema no URL could ever reach
+        with pytest.raises(tk.ValidationError) as err:
+            helpers.call_action(
+                "scheming_schema_create",
+                entity_type=entity_type,
+                definition={
+                    "about": "Example schema",
+                    type_field: schema_type,
+                    "fields": [{"field_name": "title"}],
+                },
+            )
+
+        assert "reserved for entity_type" in str(err.value.error_dict["schema_type"])
+
+    def test_reserved_type_name_for_dataset_entity_type_is_rejected(
+        self, schema_definition
+    ):
+        definition = {**schema_definition, "dataset_type": "group"}
+
+        with pytest.raises(tk.ValidationError) as err:
+            helpers.call_action("scheming_schema_create", definition=definition)
+
+        assert "reserved for entity_type" in str(err.value.error_dict["schema_type"])
+
+    def test_schema_type_claimed_by_another_entity_type_is_rejected(
+        self, schema_definition
+    ):
+        # the dataset and group/organization catch-all routes match on the
+        # same URL shape, so a live schema_type under one entity_type
+        # shadows -- and makes unreachable -- the same name under another
+        helpers.call_action("scheming_schema_create", definition=schema_definition)
+
+        with pytest.raises(tk.ValidationError) as err:
             helpers.call_action(
                 "scheming_schema_create",
                 entity_type="group",
                 definition={
                     "about": "Example schema",
-                    "group_type": "test-group",
+                    "group_type": schema_definition["dataset_type"],
                     "fields": [{"field_name": "title"}],
                 },
             )
+
+        assert "already used by entity_type 'dataset'" in str(
+            err.value.error_dict["schema_type"]
+        )
 
     def test_dataset_type_ending_in_resource_is_rejected(self, schema_definition):
         # "_resource" is the suffix CKAN appends to build a type-specific

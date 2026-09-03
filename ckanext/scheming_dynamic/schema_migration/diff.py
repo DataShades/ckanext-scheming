@@ -6,6 +6,8 @@ import dataclasses
 from difflib import SequenceMatcher
 from typing import Any
 
+from ckanext.scheming_dynamic.const import DEFAULT_ENTITY_TYPE
+
 IDENTICAL = "identical"
 WIDENED = "widened"
 NARROWED = "narrowed"
@@ -20,7 +22,28 @@ MANUAL = "manual"
 
 DATASET_GROUP = "dataset_fields"
 RESOURCE_GROUP = "resource_fields"
+FIELDS_GROUP = "fields"
 FIELD_GROUPS = (DATASET_GROUP, RESOURCE_GROUP)
+GROUP_ORG_FIELD_GROUPS = (FIELDS_GROUP,)
+
+
+def groups_for(entity_type: str) -> tuple[str, ...]:
+    """The schema's field groups: dataset+resource for datasets, a flat
+    ``fields`` list for groups and organizations."""
+    if entity_type == DEFAULT_ENTITY_TYPE:
+        return FIELD_GROUPS
+    return GROUP_ORG_FIELD_GROUPS
+
+
+def groups_in(*schemas: dict[str, Any]) -> tuple[str, ...]:
+    """The field groups actually present in one of the given expanded schemas."""
+    for schema in schemas:
+        if DATASET_GROUP in schema or RESOURCE_GROUP in schema:
+            return FIELD_GROUPS
+        if FIELDS_GROUP in schema:
+            return GROUP_ORG_FIELD_GROUPS
+    return FIELD_GROUPS
+
 
 # attributes that decide whether a stored value stays valid; everything else
 # (label, help_text, snippets, ordering) is presentation
@@ -67,7 +90,7 @@ def compare(source: dict[str, Any], target: dict[str, Any]) -> dict[str, GroupDi
     """Diff two expanded schema definitions, one GroupDiff per field group."""
     return {
         group: _compare_group(source.get(group, []), target.get(group, []))
-        for group in FIELD_GROUPS
+        for group in groups_in(target, source)
     }
 
 
@@ -259,6 +282,8 @@ def _choice_values(field: dict[str, Any]) -> set[str] | None:
 
     if choices := field.get("choices"):
         return {choice["value"] for choice in choices}
+
+    return None
 
 
 def _lost_choices(source: dict[str, Any], target: dict[str, Any]) -> list[str]:

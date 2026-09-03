@@ -78,7 +78,7 @@ class SchemaMigration(tk.BaseModel):
         )
 
     @classmethod
-    def save(  # noqa: PLR0913
+    def save(  # noqa: PLR0913 PLR0917
         cls,
         entity_type: str,
         schema_type: str,

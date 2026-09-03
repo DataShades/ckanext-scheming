@@ -19,8 +19,8 @@ class TestSchemaTypes:
                 DatasetSchema,
                 ["about", "dataset_type", "dataset_fields", "resource_fields"],
             ),
-            (GroupSchema, ["about", "group_type", "fields"]),
-            (OrganizationSchema, ["about", "organization_type", "fields"]),
+            (GroupSchema, ["group_type", "fields"]),
+            (OrganizationSchema, ["organization_type", "fields"]),
         ],
     )
     def test_required_keys(self, schema_cls, expected_required):
@@ -103,12 +103,20 @@ class TestSchemaTypes:
                 "minLength": 1,
             }
 
-    def test_field_def_is_identical_across_schema_types(self):
-        built = [
-            schema_cls().build()["$defs"]["field"]
-            for schema_cls in SCHEMA_CLASSES.values()
-        ]
-        assert all(field_def == built[0] for field_def in built)
+    def test_group_and_org_field_def_is_shared(self):
+        group = GroupSchema().build()["$defs"]["field"]
+        org = OrganizationSchema().build()["$defs"]["field"]
+        assert group == org
+
+    def test_group_and_org_schemas_have_no_form_pages(self):
+        for schema_cls in (GroupSchema, OrganizationSchema):
+            built = schema_cls().build()
+            assert "start_form_page" not in built["$defs"]
+            assert "start_form_page" not in built["$defs"]["field"]["properties"]
+
+    def test_dataset_schema_keeps_form_pages(self):
+        built = DatasetSchema().build()
+        assert "start_form_page" in built["$defs"]["field"]["properties"]
 
     def test_builtin_preset_names_include_known_presets(self):
         enum = DatasetSchema().build()["$defs"]["preset"]["enum"]

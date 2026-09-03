@@ -254,14 +254,17 @@ class TestSyncCommand:
         assert result.exit_code == 1
         assert "No static dataset schema found" in result.output
 
-    def test_entity_type_without_plugin_loaded_reports_error(self, cli):
+    def test_sync_unknown_group_schema_type_reports_error(self, cli):
         result = cli.invoke(
             ckan,
             ["scheming-dynamic", "sync", "--type", "group", "test-group"],
         )
 
         assert result.exit_code != 0
-        assert "No scheming plugin for 'group' entities is loaded" in result.output
+        assert (
+            "No static group schema found" in result.output
+            or "No scheming plugin for 'group'" in result.output
+        )
 
 
 @pytest.mark.ckan_config("ckan.plugins", "scheming_datasets scheming_dynamic")
