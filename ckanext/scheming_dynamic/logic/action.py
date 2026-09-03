@@ -5,13 +5,17 @@ from contextlib import nullcontext
 from typing import Any
 
 from click import get_current_context
-from flask import has_app_context
+from flask import current_app, has_app_context
 
 import ckan.plugins.toolkit as tk
 from ckan import model
 from ckan.logic import validate
 
-from ckanext.scheming_dynamic.const import ENTITY_TYPES, TYPE_FIELDS
+from ckanext.scheming_dynamic.const import (
+    DEFAULT_ENTITY_TYPE,
+    ENTITY_TYPES,
+    TYPE_FIELDS,
+)
 from ckanext.scheming_dynamic.logic import schema
 from ckanext.scheming_dynamic.model import (
     SchemingPreset,
@@ -59,6 +63,7 @@ def scheming_schema_create(context: Any, data_dict: dict[str, Any]) -> dict[str,
 
     _check_schema_type_not_reserved(entity_type, schema_type)
     _check_schema_type_not_claimed_elsewhere(entity_type, schema_type)
+    _check_schema_type_no_blueprint_collision(entity_type, schema_type)
     _check_schema_renders(entity_type, schema_type, definition)
 
     # locked first: the activity row's FK needs version 1 to already exist
@@ -259,6 +264,68 @@ def _check_schema_type_not_claimed_elsewhere(
                     ]
                 }
             )
+
+
+def _current_flask_app() -> Any:
+    """Return the active Flask app, or ``None`` if there isn't one.
+
+    Mirrors ``_check_schema_renders``: a web request exposes the app
+    through the app context, a Click command carries it in the context
+    meta, and anything else (some bare ``ckanapi`` calls) has neither.
+    """
+    if has_app_context():
+        return current_app._get_current_object()
+
+    try:
+        return get_current_context().meta.get("flask_app")
+    except RuntimeError:
+        return None
+
+
+def _check_schema_type_no_blueprint_collision(
+    entity_type: str, schema_type: str
+) -> None:
+    """Refuse a schema_type that collides with an existing Flask blueprint.
+
+    At startup CKAN registers one blueprint per *custom* dataset/group/
+    organization type, named exactly after the type (datasets additionally
+    get a ``<type>_resource`` one). ``register_package_blueprints`` /
+    ``register_group_blueprints`` raise ``ValueError`` -- aborting startup
+    -- when that name is already taken, whether by a CKAN core blueprint
+    (``user``, ``dashboard``, ``api``, ...) or one from another extension.
+    The cross-``entity_type`` reserved names and the ``_resource`` suffix
+    are rejected earlier; this covers every other collision, so a schema
+    saved through the UI can't wedge the next restart.
+    """
+    # Overriding a built-in type (dataset/group/organization) with a schema
+    # of the *same* name is the normal case: CKAN serves those through its
+    # own blueprint and never registers a per-type one for them. Any
+    # ENTITY_TYPES name reaching here matches entity_type --
+    # _check_schema_type_not_reserved already rejected the mismatches.
+    if schema_type == entity_type:
+        return
+
+    app = _current_flask_app()
+    if app is None:
+        # nothing to inspect here; CKAN's own startup check stays the backstop
+        return
+
+    candidates = {schema_type}
+    if entity_type == DEFAULT_ENTITY_TYPE:
+        candidates.add(f"{schema_type}_resource")
+
+    clashing = sorted(name for name in candidates if name in app.blueprints)
+    if clashing:
+        raise tk.ValidationError(
+            {
+                "schema_type": [
+                    tk._(
+                        "'{schema_type}' collides with an existing route "
+                        "({names}); pick a different name"
+                    ).format(schema_type=schema_type, names=", ".join(clashing))
+                ]
+            }
+        )
 
 
 def _check_schema_renders(

@@ -149,6 +149,59 @@ class TestSchemingSchemaCreate:
             err.value.error_dict["schema_type"]
         )
 
+    @pytest.mark.parametrize(
+        ("entity_type", "type_field"),
+        [("group", "group_type"), ("organization", "organization_type")],
+    )
+    def test_group_type_colliding_with_core_blueprint_is_rejected(
+        self, entity_type, type_field
+    ):
+        # CKAN registers a Flask blueprint named after each dynamic type at
+        # startup; "user" is already taken by core, so
+        # register_group_blueprints would raise ValueError and abort the
+        # next restart. Reject it at save time instead.
+        with pytest.raises(tk.ValidationError) as err:
+            helpers.call_action(
+                "scheming_schema_create",
+                entity_type=entity_type,
+                definition={
+                    "about": "Example schema",
+                    type_field: "user",
+                    "fields": [{"field_name": "title"}],
+                },
+            )
+
+        assert "collides with an existing route" in str(
+            err.value.error_dict["schema_type"]
+        )
+
+    def test_dataset_type_colliding_with_core_blueprint_is_rejected(
+        self, schema_definition
+    ):
+        definition = {**schema_definition, "dataset_type": "user"}
+
+        with pytest.raises(tk.ValidationError) as err:
+            helpers.call_action("scheming_schema_create", definition=definition)
+
+        assert "collides with an existing route" in str(
+            err.value.error_dict["schema_type"]
+        )
+
+    def test_dataset_schema_can_override_the_builtin_dataset_type(
+        self, schema_definition
+    ):
+        # a schema named after the built-in type it customises must still be
+        # allowed even though "dataset"/"dataset_resource" blueprints exist
+        # at runtime -- CKAN routes those through its own blueprint, it never
+        # registers a per-type one for them
+        definition = {**schema_definition, "dataset_type": "dataset"}
+
+        result = helpers.call_action(
+            "scheming_schema_create", definition=definition
+        )
+
+        assert result["schema_type"] == "dataset"
+
     def test_dataset_type_ending_in_resource_is_rejected(self, schema_definition):
         # "_resource" is the suffix CKAN appends to build a type-specific
         # resource blueprint name; a real type named that way collides with
